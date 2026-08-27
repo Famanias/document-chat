@@ -35,6 +35,6 @@
    - `filename`
    - `pageNumber` or `section`
    - `excerpt`
-   - `similarity` percentage
+   - raw `similarity` for server-side retrieval diagnostics
 4. In step 2, the AI streams its text answer without writing markdown brackets or hallucinated citation markers.
-5. In the UI, the answer is rendered cleanly alongside expandable `<details>` evidence cards displaying the exact excerpt and citation metadata.
+5. In the UI, the answer is rendered cleanly alongside expandable `<details>` evidence cards displaying the exact excerpt and citation metadata. Raw cosine similarity is intentionally not displayed as a percentage because it is a ranking signal, not calibrated answer confidence.

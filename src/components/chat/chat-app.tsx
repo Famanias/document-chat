@@ -12,7 +12,7 @@ import {
   ScanText,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ChatConversation, type UploadState } from "@/components/chat/chat-conversation";
 import type { ChatDetail, ChatSummary } from "@/lib/chat/types";
@@ -55,6 +55,8 @@ export function ChatApp() {
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [appError, setAppError] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle" });
+  const selectedIdRef = useRef<string | null>(null);
+  const loadRequestRef = useRef(0);
 
   const toggleSidebar = () => {
     setIsSidebarMinimized((prev) => {
@@ -72,22 +74,26 @@ export function ChatApp() {
       const nextId = response.chats.some((chat) => chat.id === saved)
         ? saved
         : response.chats[0].id;
+      selectedIdRef.current = nextId;
       setSelectedId(nextId);
     }
   }, []);
 
   const loadChat = useCallback(async (chatId: string) => {
+    const requestId = ++loadRequestRef.current;
     setIsLoadingChat(true);
     setAppError(null);
     try {
       const response = await requestJson<ChatResponse>(`/api/chats?id=${encodeURIComponent(chatId)}`);
+      if (requestId !== loadRequestRef.current || selectedIdRef.current !== chatId) return;
       setActiveChat(response.chat);
       window.localStorage.setItem("grounded:last-chat", chatId);
     } catch (error) {
+      if (requestId !== loadRequestRef.current || selectedIdRef.current !== chatId) return;
       setActiveChat(null);
       setAppError(error instanceof ClientApiError ? error.message : "The conversation could not be loaded.");
     } finally {
-      setIsLoadingChat(false);
+      if (requestId === loadRequestRef.current) setIsLoadingChat(false);
     }
   }, []);
 
@@ -127,6 +133,7 @@ export function ChatApp() {
     try {
       const response = await requestJson<{ chat: Pick<ChatDetail, "id"> }>("/api/chats", { method: "POST" });
       await loadChats();
+      selectedIdRef.current = response.chat.id;
       setSelectedId(response.chat.id);
       setMobileMenuOpen(false);
       setUploadState({ status: "idle" });
@@ -138,6 +145,7 @@ export function ChatApp() {
   };
 
   const selectChat = (id: string) => {
+    selectedIdRef.current = id;
     setSelectedId(id);
     setMobileMenuOpen(false);
     setUploadState({ status: "idle" });
@@ -145,6 +153,7 @@ export function ChatApp() {
 
   const uploadDocument = async (file: File) => {
     if (!activeChat) return;
+    const chatId = activeChat.id;
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (!extension || !["pdf", "txt", "md"].includes(extension)) {
       setUploadState({ status: "error", message: "Upload a PDF, TXT, or Markdown (.md) file." });
@@ -157,12 +166,15 @@ export function ChatApp() {
 
     setUploadState({ status: "uploading", filename: file.name });
     const formData = new FormData();
-    formData.set("chatId", activeChat.id);
+    formData.set("chatId", chatId);
     formData.set("file", file);
 
     try {
       await requestJson("/api/documents", { method: "POST", body: formData });
-      await Promise.all([loadChat(activeChat.id), loadChats()]);
+      await Promise.all([
+        selectedIdRef.current === chatId ? loadChat(chatId) : Promise.resolve(),
+        loadChats(),
+      ]);
       setUploadState({ status: "idle" });
     } catch (error) {
       setUploadState({
