@@ -90,7 +90,7 @@ Files are limited to 4 MB to fit comfortably below Vercel's request body limit. 
 
 ## Retrieval strategy
 
-Chunks target 1,600 characters (about 400 tokens) with 200 characters (about 50 tokens) of overlap. Splits prefer paragraph, sentence, newline, then word boundaries. Chunking happens independently inside each PDF page or Markdown section; metadata is never inferred later. The smaller target stays safely within the default free embedding model's 512-token input window.
+Chunks target 1,000 characters (about 250 tokens) with 150 characters (about 40 tokens) of overlap. Splits prefer paragraph, sentence, newline, then word boundaries. Chunking happens independently inside each PDF page or Markdown section; metadata is never inferred later. The smaller target stays safely within the default free embedding model's 512-token input window.
 
 Document and query embeddings use `liquid/lfm-2.5-embedding-350m:free` through OpenRouter at its native 1,024 dimensions. Embedding requests are batched at 32 chunks. Chat uses the tool-capable `openrouter/free` router by default; both model IDs can be overridden without code changes.
 

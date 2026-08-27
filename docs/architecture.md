@@ -9,7 +9,7 @@ Upload Pipeline
   1. User selects PDF, TXT, or Markdown document.
   2. Server validates MIME type, magic bytes, file size (<= 4MB), and content.
   3. Server extracts text while preserving source structure (PDF page numbers, Markdown headings).
-  4. Chunker splits text into ~1,600 character blocks with 200 character overlap, scoped to source boundaries.
+  4. Chunker splits text into ~1,000 character blocks with 150 character overlap, scoped to source boundaries.
   5. Chunks are embedded in batches of 32 using OpenRouter (`liquid/lfm-2.5-embedding-350m:free`, 1024-dim).
   6. Document metadata, extracted text, chunks, and vector embeddings are stored transactionally in Neon PostgreSQL.
 

@@ -21,7 +21,7 @@ Stores segmented passages and vector embeddings.
 - `id` (UUID, Primary Key): Unique chunk identifier.
 - `document_id` (UUID, Foreign Key -> `documents.id` ON DELETE CASCADE).
 - `chunk_index` (INTEGER): Zero-indexed order within the document.
-- `content` (TEXT): Text content of the chunk (~1,600 characters max).
+- `content` (TEXT): Text content of the chunk (~1,000 characters max).
 - `page_number` (INTEGER, Nullable): 1-indexed page number for PDFs.
 - `section` (TEXT, Nullable): Heading hierarchy path for Markdown.
 - `embedding` (VECTOR(1024)): 1,024-dimensional embedding vector.
