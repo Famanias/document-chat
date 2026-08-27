@@ -31,6 +31,9 @@ jobs:
       - name: Run Vitest tests
         run: npm test
 
+      - name: Validate retrieval evaluation baseline
+        run: npm run eval:retrieval:check
+
       - name: Run TypeScript typecheck
         run: npm run typecheck
 

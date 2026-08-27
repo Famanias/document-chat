@@ -16,6 +16,7 @@ This repository uses GitHub Actions for continuous integration and automated sec
 - **Steps**:
   1. `npm ci`: Clean install of dependencies from `package-lock.json`.
   2. `npm test`: Automated unit and component testing with Vitest.
-  3. `npm run typecheck`: Strict TypeScript typechecking with `tsc --noEmit`.
-  4. `npm run lint`: Code quality and lint verification with ESLint.
-  5. `npm run build`: Next.js Turbopack production build verification.
+  3. `npm run eval:retrieval:check`: Credential-free fixture validation and deterministic baseline comparison.
+  4. `npm run typecheck`: Strict TypeScript typechecking with `tsc --noEmit`.
+  5. `npm run lint`: Code quality and lint verification with ESLint.
+  6. `npm run build`: Next.js Turbopack production build verification.

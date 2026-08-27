@@ -14,6 +14,7 @@
 /coverage
 /.artifacts/
 /tmp/
+/evaluation/retrieval/runs/
 
 # next.js
 /.next/

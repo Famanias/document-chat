@@ -126,12 +126,13 @@ Run the complete local check:
 
 ```bash
 npm test
+npm run eval:retrieval:check
 npm run typecheck
 npm run lint
 npm run build
 ```
 
-Current result: 18 tests pass across seven files; TypeScript, ESLint, and the Next.js production build pass. Tests cover:
+Current result: 30 tests pass across ten files; the credential-free retrieval baseline, TypeScript, ESLint, and the Next.js production build pass. Tests cover:
 
 - PDF text extraction with retained page number
 - TXT extraction
@@ -144,6 +145,10 @@ Current result: 18 tests pass across seven files; TypeScript, ESLint, and the Ne
 - strict chat-request validation, including malformed and oversized message parts
 - stale conversation-load protection when users switch chats quickly
 - plain-text answer normalization when a routed model emits stray Markdown markers
+- runtime validation of versioned PDF/TXT/Markdown retrieval cases
+- shared cosine ranking, retrieval recall, evidence correctness, and no-answer evidence selection
+
+See [`evaluation/retrieval/README.md`](evaluation/retrieval/README.md) for the fixture coverage table, baseline interpretation, case-authoring process, and explicit credentialed answer-evaluation command.
 
 The production server was also tested in isolated desktop and mobile browsers: `/` and application APIs responded normally, no application console exceptions appeared, layouts had no horizontal overflow, and an unsupported upload returned 415 with a clear error.
 

@@ -17,15 +17,17 @@
 
 - Embedding model: `liquid/lfm-2.5-embedding-350m:free` via OpenRouter (1,024 dimensions).
 - Batch size: 32 chunks per API call during ingestion.
-- Retrieval query: Embeds user question and executes a cosine distance search using pgvector:
+- Retrieval query: Embeds the user question and uses pgvector to preselect candidates:
   ```sql
-  SELECT chunks.*, 1 - (chunks.embedding <=> $1::vector) AS similarity
+  SELECT chunks.*, chunks.embedding::text AS embedding
   FROM document_chunks chunks
   INNER JOIN chat_documents cd ON cd.document_id = chunks.document_id
   WHERE cd.chat_id = $2
   ORDER BY chunks.embedding <=> $1::vector
-  LIMIT 6;
+  LIMIT 24;
   ```
+
+The database preselects up to 24 candidates. Final top-six ordering, cosine scoring, evidence IDs, and excerpts pass through the shared production boundary in `src/lib/ai/retrieval-ranking.ts`. The credential-free evaluator uses controlled vectors with this same boundary; see `evaluation/retrieval/README.md` for the versioned dataset, metrics, and baseline.
 
 ## Citation Architecture
 

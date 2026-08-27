@@ -1,8 +1,12 @@
 import "server-only";
 
-import { db } from "@/lib/db";
 import { embedQuery } from "@/lib/ai/embeddings";
-import type { Evidence } from "@/lib/chat/types";
+import {
+  rankEvidenceCandidates,
+  RETRIEVAL_CANDIDATE_LIMIT,
+  type RetrievalCandidate,
+} from "@/lib/ai/retrieval-ranking";
+import { db } from "@/lib/db";
 
 type EvidenceRow = {
   chunk_id: string;
@@ -12,13 +16,19 @@ type EvidenceRow = {
   section: string | null;
   chunk_index: number;
   content: string;
-  similarity: number | string;
+  embedding: string | number[];
 };
 
-function createExcerpt(content: string) {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 420) return normalized;
-  return `${normalized.slice(0, 417).trimEnd()}…`;
+function parseEmbedding(value: string | number[]) {
+  if (Array.isArray(value)) return value;
+  const parsed: unknown = JSON.parse(value);
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some((coordinate) => typeof coordinate !== "number")
+  ) {
+    throw new Error("Database returned a malformed chunk embedding.");
+  }
+  return parsed;
 }
 
 export async function retrieveEvidence(chatId: string, question: string) {
@@ -33,21 +43,20 @@ export async function retrieveEvidence(chatId: string, question: string) {
         chunks.section,
         chunks.chunk_index,
         chunks.content,
-        1 - (chunks.embedding <=> $1::vector) AS similarity
+        chunks.embedding::text AS embedding
       FROM document_chunks AS chunks
       INNER JOIN documents ON documents.id = chunks.document_id
       INNER JOIN chat_documents ON chat_documents.document_id = documents.id
       WHERE chat_documents.chat_id = $2
         AND documents.status = 'ready'
       ORDER BY chunks.embedding <=> $1::vector
-      LIMIT 6
+      LIMIT ${RETRIEVAL_CANDIDATE_LIMIT}
     `,
     [JSON.stringify(queryEmbedding), chatId],
   )) as unknown as EvidenceRow[];
 
-  return rows.map(
-    (row, index): Evidence => ({
-      id: `E${index + 1}`,
+  const candidates = rows.map(
+    (row): RetrievalCandidate => ({
       chunkId: row.chunk_id,
       documentId: row.document_id,
       filename: row.filename,
@@ -55,8 +64,9 @@ export async function retrieveEvidence(chatId: string, question: string) {
       section: row.section,
       chunkIndex: row.chunk_index,
       content: row.content,
-      excerpt: createExcerpt(row.content),
-      similarity: Number(row.similarity),
+      embedding: parseEmbedding(row.embedding),
     }),
   );
+
+  return rankEvidenceCandidates(queryEmbedding, candidates);
 }

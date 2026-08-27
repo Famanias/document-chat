@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval:retrieval": "tsx scripts/retrieval-eval.ts",
+    "eval:retrieval:check": "tsx scripts/retrieval-eval.ts --check",
+    "eval:retrieval:credentialed": "tsx scripts/retrieval-eval.ts --credentialed",
     "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
@@ -39,6 +42,7 @@
     "eslint-config-next": "16.3.3",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.11"
   }
