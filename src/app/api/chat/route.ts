@@ -16,6 +16,7 @@ import { hasReadyDocuments, loadChat, saveMessage } from "@/lib/chat/store";
 import type { ChatMessage, Evidence } from "@/lib/chat/types";
 import { validateChatRequest } from "@/lib/chat/validate-request";
 import { modelConfig, requireServerEnv } from "@/lib/env";
+import { resolveWorkspace } from "@/lib/workspaces/context";
 
 export const maxDuration = 60;
 
@@ -39,6 +40,7 @@ function evidencePrompt(evidence: Evidence[]) {
 
 export async function POST(request: Request) {
   try {
+    const workspace = await resolveWorkspace();
     let requestBody: unknown;
     try {
       requestBody = await request.json();
@@ -48,9 +50,9 @@ export async function POST(request: Request) {
     const parsed = validateChatRequest(requestBody);
     if (!parsed) throw new AppError(400, "The message could not be sent.");
 
-    const chat = await loadChat(parsed.id);
+    const chat = await loadChat(workspace, parsed.id);
     if (!chat) throw new AppError(404, "That conversation no longer exists.");
-    if (!(await hasReadyDocuments(chat.id))) {
+    if (!(await hasReadyDocuments(workspace, chat.id))) {
       throw new AppError(409, "Upload a document before asking a question.");
     }
 
@@ -69,8 +71,8 @@ export async function POST(request: Request) {
     const question = messageText(incomingMessage);
     if (!question) throw new AppError(400, "Enter a question before sending.");
 
-    if (!parsed.retry) await saveMessage(chat.id, incomingMessage);
-    const evidence = await retrieveEvidence(chat.id, question);
+    if (!parsed.retry) await saveMessage(workspace, chat.id, incomingMessage);
+    const evidence = await retrieveEvidence(workspace, chat.id, question);
     const tools = createEvidenceTools(evidence);
     const history = parsed.retry
       ? chat.messages.slice(0, storedMessageIndex + 1)
@@ -121,7 +123,7 @@ ${evidencePrompt(evidence)}`,
         onEnd: async ({ outcome, responseMessage }) => {
           if (outcome.status !== "completed" || !messageText(responseMessage)) return;
           try {
-            await saveMessage(chat.id, responseMessage);
+            await saveMessage(workspace, chat.id, responseMessage);
           } catch (error) {
             console.error("Failed to persist completed chat stream", error);
           }
