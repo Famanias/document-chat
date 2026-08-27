@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { AppError } from "@/lib/api-errors";
-import { MAX_FILE_BYTES, validateUpload } from "@/lib/documents/validate-upload";
+import {
+  MAX_DOCUMENT_CHUNKS,
+  MAX_FILE_BYTES,
+  validateChunkCount,
+  validateUpload,
+} from "@/lib/documents/validate-upload";
 
 describe("validateUpload", () => {
   it.each([
@@ -22,6 +27,12 @@ describe("validateUpload", () => {
   it("rejects files over the serverless upload limit", () => {
     expect(() => validateUpload({ name: "large.pdf", type: "application/pdf", size: MAX_FILE_BYTES + 1 })).toThrow(
       "Documents are limited to 4 MB",
+    );
+  });
+
+  it("rejects documents whose extracted text would exceed synchronous processing limits", () => {
+    expect(() => validateChunkCount(MAX_DOCUMENT_CHUNKS + 1)).toThrow(
+      `more than ${MAX_DOCUMENT_CHUNKS} passages`,
     );
   });
 });
