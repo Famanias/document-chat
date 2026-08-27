@@ -4,7 +4,7 @@ Grounded is a small document-chat application for asking questions of PDF, TXT, 
 
 ## Live demo
 
-**Vercel:** `https://your-project.vercel.app`
+**Vercel:** [https://document-chat-eta.vercel.app](https://document-chat-eta.vercel.app)
 
 The application is configured for Vercel Hobby and Neon Free; see [Deployment](#deployment).
 
