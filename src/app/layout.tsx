@@ -17,7 +17,11 @@ export const metadata: Metadata = {
   description: "Ask questions and inspect the exact evidence from your documents.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"
