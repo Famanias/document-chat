@@ -1,0 +1,9 @@
+.git
+.next
+.artifacts
+tmp
+node_modules
+.env*
+.neon
+coverage
+*.tsbuildinfo
