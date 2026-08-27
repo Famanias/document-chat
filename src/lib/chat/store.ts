@@ -159,16 +159,23 @@ export async function loadChat(chatId: string): Promise<ChatDetail | null> {
 
 export async function saveMessage(chatId: string, message: ChatMessage) {
   const content = textFromMessage(message);
-  await db().query(
+  const saved = (await db().query(
     `
       INSERT INTO messages (id, chat_id, role, content, structured_data)
       VALUES ($1, $2, $3, $4, $5::jsonb)
       ON CONFLICT (id) DO UPDATE SET
         content = EXCLUDED.content,
         structured_data = EXCLUDED.structured_data
+      WHERE messages.chat_id = EXCLUDED.chat_id
+        AND messages.role = EXCLUDED.role
+      RETURNING id
     `,
     [message.id, chatId, message.role, content, JSON.stringify({ parts: message.parts })],
-  );
+  )) as unknown as Array<{ id: string }>;
+
+  if (saved.length !== 1) {
+    throw new Error("A message ID cannot be reused across conversations or roles.");
+  }
 
   if (message.role === "user" && content) {
     await db().query(
@@ -184,10 +191,6 @@ export async function saveMessage(chatId: string, message: ChatMessage) {
   } else {
     await db().query("UPDATE chats SET updated_at = NOW() WHERE id = $1", [chatId]);
   }
-}
-
-export async function saveMessages(chatId: string, messages: ChatMessage[]) {
-  await Promise.all(messages.map((message) => saveMessage(chatId, message)));
 }
 
 export async function hasReadyDocuments(chatId: string) {

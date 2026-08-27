@@ -7,7 +7,7 @@ Grounded is built with TypeScript and the Next.js App Router, using the Vercel A
 ```text
 Upload Pipeline
   1. User selects PDF, TXT, or Markdown document.
-  2. Server validates MIME type, magic bytes, file size (<= 4MB), and content.
+  2. Server validates MIME type, magic bytes, file size (<= 4MB), content, and a 300-passage synchronous-processing cap.
   3. Server extracts text while preserving source structure (PDF page numbers, Markdown headings).
   4. Chunker splits text into ~1,600 character blocks with 200 character overlap, scoped to source boundaries.
   5. Chunks are embedded in batches of 32 using OpenRouter (`liquid/lfm-2.5-embedding-350m:free`, 1024-dim).
@@ -19,9 +19,9 @@ Query & Retrieval Pipeline
   3. Query is embedded into a 1024-dimensional vector.
   4. Cosine similarity search retrieves the top 6 relevant chunks scoped to documents in the current chat.
   5. In Step 1, the AI is forced to call the `showEvidence` tool with the IDs of supporting chunks.
-  6. The server validates evidence IDs and injects authoritative metadata (filename, page/section, excerpt, similarity).
+  6. The server validates evidence IDs and injects authoritative metadata (filename, page/section, excerpt, plus similarity for diagnostics).
   7. In Step 2, the AI streams a concise plain-text answer grounded strictly in the evidence.
-  8. Completed response and structured evidence parts are persisted in Neon PostgreSQL.
+  8. Only a completed, non-empty response and its structured evidence parts are persisted in Neon PostgreSQL; failed or aborted streams retain the user question without a blank assistant row.
   9. UI renders the response and expandable citation cards.
 ```
 

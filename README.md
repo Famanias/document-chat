@@ -26,7 +26,7 @@ DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 OPENROUTER_API_KEY=your_openrouter_key
 ```
 
-Optional overrides are `OPENROUTER_CHAT_MODEL` (default `openrouter/free`) and `OPENROUTER_EMBEDDING_MODEL` (default `liquid/lfm-2.5-embedding-350m:free`). The defaults allow an inexpensive evaluator demo without a second model-provider key. Embeddings use the model's native 1,024 dimensions.
+Optional overrides are `OPENROUTER_CHAT_MODEL` (default `openrouter/free`) and `OPENROUTER_EMBEDDING_MODEL` (default `liquid/lfm-2.5-embedding-350m:free`). The defaults are useful for no-cost smoke testing, but free-route quotas and model selection can change. For an evaluator-facing deployment, use an OpenRouter account with credits and pin a currently available tool-capable chat model. Embeddings use the model's native 1,024 dimensions.
 
 Create a Neon project, copy its pooled connection string into `DATABASE_URL`, then run:
 
@@ -68,7 +68,7 @@ Important boundaries:
 - `src/components/chat`: conversation, composer, state, and evidence UI
 - `migrations`: PostgreSQL and pgvector schema
 
-The client sends only the newest user message. The server reloads trusted history, validates the reconstructed AI SDK UI messages, and uses stable message IDs with database upserts. This prevents duplicate assistant rows when a stream finishes or the page reloads. `consumeStream()` lets server-side completion and persistence continue if the browser disconnects.
+The client sends only the newest user message. The server strictly validates the text-only request, reloads trusted history, validates the reconstructed AI SDK UI messages, and uses stable message IDs with conversation-scoped database upserts. This prevents duplicate or cross-conversation message updates when a stream finishes or the page reloads. `consumeStream()` lets server-side completion and persistence continue if the browser disconnects. Only completed, non-empty assistant messages are stored; failed responses keep the user's question and expose a retry action without leaving a blank assistant row. Provider reasoning is neither sent to the browser nor persisted.
 
 ## Database schema
 
@@ -86,7 +86,7 @@ Foreign keys cascade on chat/document deletion. The schema includes indexes for 
 - **Markdown:** ATX headings (`#` through `######`) are tracked as a hierarchy such as `Product › Limits`; that section path follows every resulting chunk.
 - **TXT:** the filename and exact excerpt provide source context; page/section fields remain null.
 
-Files are limited to 4 MB to fit comfortably below Vercel's request body limit. PDFs are capped at 150 pages, and text files must be valid UTF-8. Filenames are normalized, MIME type and extension are cross-checked, PDF magic bytes are verified, and binary-looking text is rejected.
+Files are limited to 4 MB to fit comfortably below Vercel's request body limit. PDFs are capped at 150 pages, and indexing is capped at 300 passages (roughly 100k tokens) so synchronous embedding work remains bounded by the 60-second route budget. Text files must be valid UTF-8. Filenames are normalized, MIME type and extension are cross-checked, PDF magic bytes are verified, and binary-looking text is rejected.
 
 ## Retrieval strategy
 
@@ -105,9 +105,9 @@ Retrieved rows receive request-local labels (`E1`–`E6`). The AI is forced to c
 - PDF page or Markdown section
 - chunk index
 - exact excerpt
-- cosine similarity
+- cosine similarity (retained as server-side retrieval diagnostics)
 
-The model cannot supply or modify citation metadata. Invalid IDs are discarded. The tool result is stored as an AI SDK UI message part and rendered as expandable evidence cards, which are the authoritative citations and remain identical during streaming and after a reload. Inline labels are intentionally omitted: credentialed multi-chunk testing showed that a free routed model could swap `E1` and `E2` in prose even when it selected the correct chunks, while the server-owned cards retained the correct filename, page, excerpt, and similarity.
+The model cannot supply or modify citation metadata. Invalid IDs are discarded. The tool result is stored as an AI SDK UI message part and rendered as expandable evidence cards, which are the authoritative citations and remain identical during streaming and after a reload. The cards show filename, source location, and exact excerpt. They intentionally omit a percentage because raw cosine similarity is useful for ranking but is not calibrated answer confidence. Inline labels are also omitted: credentialed multi-chunk testing showed that a free routed model could swap `E1` and `E2` in prose even when it selected the correct chunks, while the server-owned cards retained the correct source metadata.
 
 If no evidence supports the question, the prompt requires: “I couldn't find that in the uploaded document.” The tool selects no cards, avoiding a misleading citation.
 
@@ -131,17 +131,21 @@ npm run lint
 npm run build
 ```
 
-Current result: 11 tests pass across four files; TypeScript, ESLint, and the Next.js production build pass. Tests cover:
+Current result: 18 tests pass across seven files; TypeScript, ESLint, and the Next.js production build pass. Tests cover:
 
 - PDF text extraction with retained page number
 - TXT extraction
 - Markdown section hierarchy
 - supported PDF/TXT/MD validation
 - unsupported and oversized upload rejection
+- extracted-text passage-limit rejection before embeddings are requested
 - chunk boundaries, overlap, and source metadata
-- citation-card filename, page, relevance, and excerpt rendering
+- citation-card filename, page/section, and excerpt rendering without a misleading confidence percentage
+- strict chat-request validation, including malformed and oversized message parts
+- stale conversation-load protection when users switch chats quickly
+- plain-text answer normalization when a routed model emits stray Markdown markers
 
-The production server was also smoke-tested: `/` returns 200, database failures return a generic safe message, and an unsupported upload returns 415 with a clear error.
+The production server was also tested in isolated desktop and mobile browsers: `/` and application APIs responded normally, no application console exceptions appeared, layouts had no horizontal overflow, and an unsupported upload returned 415 with a clear error.
 
 Credentialed verification was also completed against Neon and OpenRouter:
 
@@ -152,26 +156,29 @@ Credentialed verification was also completed against Neon and OpenRouter:
 - An unsupported CEO-favorite-color question returned “I couldn't find that in the uploaded document.” with zero evidence cards.
 - Markdown evidence retained the `Launch Plan › Ownership` section; TXT evidence correctly omitted page/section.
 - Streaming produced progressive AI SDK data events and `[DONE]`; reloading the chat API retained messages and structured evidence without duplicates.
+- Empty, malformed, binary-looking, oversized, and mismatched files failed with bounded 4xx responses; a 174 KB text document indexed successfully.
+- One routed free-model request failed mid-stream during stress testing. The hardened implementation now preserves the question, avoids persisting an empty assistant message, and offers a retry. The same run exhausted the account's free-model daily quota, so quota must be restored before the public demo is submitted.
 
 ## Deployment
 
 1. Create a Neon Free project and run `npm run db:migrate` against its connection string.
 2. Import the Git repository into a Vercel Hobby project.
-3. Add `DATABASE_URL` and `OPENROUTER_API_KEY` to Vercel Production, Preview, and Development as appropriate.
+3. Add `DATABASE_URL` and `OPENROUTER_API_KEY` to Vercel Production, Preview, and Development as appropriate. For a stable public demo, use an account with credits and set `OPENROUTER_CHAT_MODEL` to a fixed, currently available tool-capable model.
 4. Deploy with the Vercel dashboard or `vercel --prod`.
-5. Independently verify PDF/TXT/MD upload, reload persistence, the three retrieval cases, citation accuracy, streaming, and a forced provider error.
+5. Check provider quota, then independently verify PDF/TXT/MD upload, reload persistence, direct/multi-part/unsupported retrieval, citation accuracy, streaming, and a forced provider error.
 
 No persistent filesystem is used. Both long-running routes declare a 60-second maximum duration, and upload/page limits bound serverless memory and request time.
 
 ## Time spent
 
-Total active assisted implementation and verification time: approximately **65 minutes** (under the five-hour cap).
+Total active assisted implementation, evaluator-style hardening, and verification time: approximately **95 minutes** (under the five-hour cap).
 
 - Repository inspection, version-matched docs, schema, and plan — 8 minutes
 - Document pipeline, embeddings, and storage — 14 minutes
 - Chat, retrieval, streaming, persistence, and citations — 15 minutes
 - UI states and responsive evidence experience — 8 minutes
 - Credentialed testing, fixes, documentation, and deployment — 20 minutes
+- Evaluator-style stress testing, reliability hardening, and final audit — 30 minutes
 
 ## AI tools used
 
@@ -193,6 +200,6 @@ I replaced the named import with the package's default CommonJS interop import a
 - No hybrid lexical/vector retrieval, reranking, or retrieval evaluation dataset.
 - No authentication or tenant isolation; required before exposing real private documents.
 - No document deletion/re-indexing UI.
-- The default free OpenRouter routes can have tighter rate limits and variable latency/model selection; a fixed paid model is preferable for a production SLA.
+- The default free OpenRouter routes have tighter rate limits and variable latency/model selection. The stress audit exhausted the demo account's daily free-model quota; a credited account and fixed tool-capable model are required before submission.
 
-With more time, the next work would be credentialed end-to-end verification and deployment first, then an ingestion job with observable progress, followed by a small retrieval evaluation set and optional hybrid search.
+With more time, the next work would be a small repeatable retrieval evaluation set, then an ingestion job with observable progress, followed by optional hybrid search only if the evaluation data justified it.

@@ -3,7 +3,7 @@ import { embedDocumentChunks } from "@/lib/ai/embeddings";
 import { chunkSegments } from "@/lib/documents/chunk";
 import { parseDocument } from "@/lib/documents/parse";
 import { storeDocument } from "@/lib/documents/store";
-import { validateUpload } from "@/lib/documents/validate-upload";
+import { validateChunkCount, validateUpload } from "@/lib/documents/validate-upload";
 
 export const maxDuration = 60;
 
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     const parsed = await parseDocument(extension, await file.arrayBuffer());
     const chunks = chunkSegments(parsed.segments);
     if (chunks.length === 0) throw new AppError(422, "No readable text was found in this document.");
+    validateChunkCount(chunks.length);
     const embeddings = await embedDocumentChunks(chunks.map((chunk) => chunk.content));
     const document = await storeDocument({
       chatId,
