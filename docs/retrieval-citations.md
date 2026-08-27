@@ -8,8 +8,8 @@
 
 ## Chunking
 
-- Target size: 1,600 characters (~400 tokens).
-- Overlap: 200 characters (~50 tokens).
+- Target size: 1,000 characters (~250 tokens).
+- Overlap: 150 characters (~40 tokens).
 - Split points prefer natural boundaries (paragraphs `\n\n`, sentences `. `, single newlines `\n`, spaces ` `).
 - Scoped to individual source segments (pages/sections) so metadata is never diluted.
 
