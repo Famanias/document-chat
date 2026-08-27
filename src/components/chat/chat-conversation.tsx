@@ -9,6 +9,7 @@ import {
   FilePlus2,
   FileText,
   Menu,
+  PanelLeftOpen,
   Paperclip,
   Send,
   Square,
@@ -30,6 +31,8 @@ type Props = {
   onUpload: (file: File) => Promise<void>;
   onMenu: () => void;
   onConversationChanged: () => void;
+  isSidebarMinimized?: boolean;
+  onToggleSidebar?: () => void;
 };
 
 const suggestions = [
@@ -51,6 +54,8 @@ export function ChatConversation({
   onUpload,
   onMenu,
   onConversationChanged,
+  isSidebarMinimized,
+  onToggleSidebar,
 }: Props) {
   const [input, setInput] = useState("");
   const [dismissedError, setDismissedError] = useState(false);
@@ -135,6 +140,17 @@ export function ChatConversation({
         >
           <Menu aria-hidden="true" className="size-5" />
         </button>
+        {isSidebarMinimized && onToggleSidebar ? (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="hidden size-11 items-center justify-center rounded-xl text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 lg:flex"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <PanelLeftOpen aria-hidden="true" className="size-5" />
+          </button>
+        ) : null}
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold text-[#20302c]">
             {chat.title || "New conversation"}
@@ -145,16 +161,6 @@ export function ChatConversation({
               : "No document attached"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploadState.status === "uploading"}
-          aria-label="Add document"
-          className="flex min-h-11 items-center gap-2 rounded-xl border bg-white px-3.5 text-sm font-medium text-[#31413d] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <FilePlus2 aria-hidden="true" className="size-4" />
-          <span className="hidden sm:inline">Add document</span>
-        </button>
       </header>
 
       {chat.documents.length > 0 ? (

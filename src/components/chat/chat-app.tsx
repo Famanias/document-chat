@@ -5,6 +5,8 @@ import {
   AlertCircle,
   FileText,
   MessageSquareText,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   ScanText,
@@ -50,10 +52,19 @@ export function ChatApp() {
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [appError, setAppError] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle" });
   const selectedIdRef = useRef<string | null>(null);
   const loadRequestRef = useRef(0);
+
+  const toggleSidebar = () => {
+    setIsSidebarMinimized((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("grounded:sidebar-minimized", String(next));
+      return next;
+    });
+  };
 
   const loadChats = useCallback(async (chooseChat = false) => {
     const response = await requestJson<ChatsResponse>("/api/chats");
@@ -90,6 +101,10 @@ export function ChatApp() {
     setIsLoading(true);
     setAppError(null);
     try {
+      const savedSidebar = window.localStorage.getItem("grounded:sidebar-minimized");
+      if (savedSidebar === "true") {
+        setIsSidebarMinimized(true);
+      }
       await loadChats(true);
     } catch {
       setAppError("Grounded could not connect to its workspace. Check the app configuration and try again.");
@@ -181,9 +196,25 @@ export function ChatApp() {
             <div className="text-[11px] text-[var(--muted)]">Document intelligence</div>
           </div>
         </div>
-        <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex size-11 items-center justify-center rounded-xl text-[var(--muted)] hover:bg-white focus-visible:outline-2 lg:hidden" aria-label="Close conversations">
-          <X aria-hidden="true" className="size-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="hidden size-11 items-center justify-center rounded-xl text-[var(--muted)] transition-colors hover:bg-white focus-visible:outline-2 lg:flex"
+            aria-label="Minimize sidebar"
+            title="Minimize sidebar"
+          >
+            <PanelLeftClose aria-hidden="true" className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex size-11 items-center justify-center rounded-xl text-[var(--muted)] hover:bg-white focus-visible:outline-2 lg:hidden"
+            aria-label="Close conversations"
+          >
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        </div>
       </div>
 
       <div className="p-3">
@@ -229,7 +260,7 @@ export function ChatApp() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[var(--background)]">
-      <div className="hidden h-full lg:block">{sidebar}</div>
+      <div className={clsx("h-full", isSidebarMinimized ? "hidden" : "hidden lg:block")}>{sidebar}</div>
       {mobileMenuOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button type="button" className="absolute inset-0 cursor-default bg-[#12201d]/35 backdrop-blur-[1px]" onClick={() => setMobileMenuOpen(false)} aria-label="Close conversations" />
@@ -249,12 +280,25 @@ export function ChatApp() {
           onUpload={uploadDocument}
           onMenu={() => setMobileMenuOpen(true)}
           onConversationChanged={() => void loadChats()}
+          isSidebarMinimized={isSidebarMinimized}
+          onToggleSidebar={toggleSidebar}
         />
       ) : (
         <main className="relative flex min-w-0 flex-1 items-center justify-center bg-white px-6">
           <button type="button" onClick={() => setMobileMenuOpen(true)} className="absolute left-3 top-3 flex size-11 items-center justify-center rounded-xl border text-[var(--muted)] focus-visible:outline-2 lg:hidden" aria-label="Open conversations">
             <MessageSquareText aria-hidden="true" className="size-5" />
           </button>
+          {isSidebarMinimized ? (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="absolute left-3 top-3 hidden size-11 items-center justify-center rounded-xl border bg-white text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 lg:flex"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen aria-hidden="true" className="size-5" />
+            </button>
+          ) : null}
           <div className="max-w-md text-center">
             {appError ? (
               <>

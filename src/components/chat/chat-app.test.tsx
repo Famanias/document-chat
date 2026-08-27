@@ -4,6 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatApp } from "@/components/chat/chat-app";
 import type { ChatDetail, ChatSummary } from "@/lib/chat/types";
 
+vi.mock("@ai-sdk/react", () => ({
+  useChat: () => ({
+    messages: [],
+    sendMessage: vi.fn(),
+    status: "ready",
+    error: undefined,
+    stop: vi.fn(),
+    regenerate: vi.fn(),
+  }),
+}));
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
@@ -32,16 +43,7 @@ function detail(id: string, title: string): ChatDetail {
 describe("ChatApp", () => {
   beforeEach(() => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
-    const values = new Map<string, string>();
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      value: {
-        clear: () => values.clear(),
-        getItem: (key: string) => values.get(key) ?? null,
-        removeItem: (key: string) => values.delete(key),
-        setItem: (key: string, value: string) => values.set(key, value),
-      },
-    });
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -82,5 +84,45 @@ describe("ChatApp", () => {
 
     expect(screen.getByRole("heading", { name: "Second chat" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "First chat" })).not.toBeInTheDocument();
+  });
+
+  it("allows toggling sidebar minimize and persists preference", async () => {
+    const chatId = "11111111-1111-4111-8111-111111111111";
+    const chats: ChatSummary[] = [
+      {
+        id: chatId,
+        title: "Test Chat",
+        documentCount: 0,
+        messageCount: 0,
+        updatedAt: "2026-08-27T00:00:00.000Z",
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/api/chats") return response({ chats });
+        if (url.includes(chatId)) return response({ chat: detail(chatId, "Test Chat") });
+        throw new Error(`Unexpected request: ${url}`);
+      }),
+    );
+
+    render(<ChatApp />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No document attached")).toBeInTheDocument();
+    });
+
+    const minimizeButton = screen.getByRole("button", { name: /minimize sidebar/i });
+    expect(minimizeButton).toBeInTheDocument();
+
+    fireEvent.click(minimizeButton);
+    expect(window.localStorage.getItem("grounded:sidebar-minimized")).toBe("true");
+
+    const expandButton = await screen.findByRole("button", { name: /expand sidebar/i });
+    expect(expandButton).toBeInTheDocument();
+
+    fireEvent.click(expandButton);
+    expect(window.localStorage.getItem("grounded:sidebar-minimized")).toBe("false");
   });
 });
