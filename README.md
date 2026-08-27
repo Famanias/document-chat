@@ -64,21 +64,23 @@ Important boundaries:
 - `src/lib/documents`: upload validation, parsing, chunking, and transactional storage
 - `src/lib/ai`: embedding, vector retrieval, and the evidence-selection tool
 - `src/lib/chat`: chat/message persistence and UI-message reconstruction
+- `src/lib/workspaces`: server-only workspace resolution and ownership lifecycle
 - `src/app/api`: narrow HTTP validation and orchestration
 - `src/components/chat`: conversation, composer, state, and evidence UI
 - `migrations`: PostgreSQL and pgvector schema
 
-The client sends only the newest user message. The server strictly validates the text-only request, reloads trusted history, validates the reconstructed AI SDK UI messages, and uses stable message IDs with conversation-scoped database upserts. This prevents duplicate or cross-conversation message updates when a stream finishes or the page reloads. `consumeStream()` lets server-side completion and persistence continue if the browser disconnects. Only completed, non-empty assistant messages are stored; failed responses keep the user's question and expose a retry action without leaving a blank assistant row. Provider reasoning is neither sent to the browser nor persisted.
+The client sends only the newest user message. The server resolves workspace identity independently of client input, strictly validates the text-only request, reloads workspace-scoped trusted history, validates the reconstructed AI SDK UI messages, and uses stable message IDs with workspace-and-conversation-scoped database upserts. This prevents duplicate, cross-workspace, or cross-conversation message updates when a stream finishes or the page reloads. `consumeStream()` lets server-side completion and persistence continue if the browser disconnects. Only completed, non-empty assistant messages are stored; failed responses keep the user's question and expose a retry action without leaving a blank assistant row. Provider reasoning is neither sent to the browser nor persisted.
 
 ## Database schema
 
-- `documents`: filename, MIME type, size, full extracted text, page count, processing status, timestamps
-- `document_chunks`: ordered content, page/section metadata, and a `vector(1024)` embedding
-- `chats`: optional title and activity timestamps
-- `chat_documents`: many-to-many link that scopes retrieval to the open conversation
-- `messages`: role, readable text, and AI SDK UI `parts` in `structured_data` JSONB so tool evidence survives reloads
+- `workspaces`: ownership roots resolved only on the server
+- `documents`: workspace ID, filename, MIME type, size, full extracted text, page count, processing status, timestamps
+- `document_chunks`: workspace ID, ordered content, page/section metadata, and a `vector(1024)` embedding
+- `chats`: workspace ID, optional title, and activity timestamps
+- `chat_documents`: workspace-owned many-to-many link that scopes retrieval to the open conversation
+- `messages`: workspace ID, role, readable text, and AI SDK UI `parts` in `structured_data` JSONB so tool evidence survives reloads
 
-Foreign keys cascade on chat/document deletion. The schema includes indexes for chat message ordering, document chunk order, recent chats, and HNSW cosine search.
+Composite foreign keys prevent links, chunks, or messages from crossing a workspace boundary. Workspace deletion cascades through its complete graph without affecting other workspaces. The temporary pre-auth resolver maps the existing unauthenticated UI to one seeded demo workspace; guest and member identity will replace that narrow adapter later. The schema includes workspace-first indexes for scoped access plus HNSW cosine search.
 
 ## Document processing
 
@@ -117,7 +119,7 @@ If no evidence supports the question, the prompt requires: “I couldn't find th
 - Top-six semantic search is predictable and adequate for small documents; no keyword search, reranker, or answer-confidence classifier was added.
 - The application supports multiple documents per chat, but does not include document deletion or re-indexing controls.
 - Full extracted text and embeddings live in Postgres. No local filesystem or object storage is required.
-- Authentication, tenant isolation, billing, and admin features are deliberately out of scope. Without authentication, this is a single shared demo workspace.
+- Authentication, identity lifecycle, billing, and admin features are deliberately out of scope. Persistence enforces workspace isolation, while the current pre-auth adapter still resolves all demo traffic to one shared workspace until guest/member identity is added.
 - The UI uses plain streamed text rather than a full Markdown renderer, reducing dependencies and rendering risk.
 
 ## Verification
@@ -203,7 +205,7 @@ I replaced the named import with the package's default CommonJS interop import a
 - No OCR for scanned PDFs.
 - No background jobs, resumable indexing, progress events, or retry queue.
 - No hybrid lexical/vector retrieval, reranking, or retrieval evaluation dataset.
-- No authentication or tenant isolation; required before exposing real private documents.
+- No guest/member authentication or identity lifecycle yet. Database and query ownership boundaries are in place, but the pre-auth demo adapter remains shared and must be replaced before exposing real private documents.
 - No document deletion/re-indexing UI.
 - The default free OpenRouter routes have tighter rate limits and variable latency/model selection. The stress audit exhausted the demo account's daily free-model quota; a credited account and fixed tool-capable model are required before submission.
 
