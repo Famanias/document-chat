@@ -1,0 +1,625 @@
+{
+  "artifactSchemaVersion": 1,
+  "recordedAt": "2026-08-27T15:53:07.956Z",
+  "dataset": {
+    "id": "grounded-retrieval-core",
+    "version": 1,
+    "fingerprint": "ae77b12d9681e128a2439d33ee563f9aae96e71784e641c2bf916e910c3c04e0",
+    "caseCount": 7,
+    "documentCount": 3
+  },
+  "run": {
+    "retrieval": {
+      "algorithm": "cosine-similarity-v1",
+      "productionBoundary": "src/lib/ai/retrieval-ranking.ts#rankEvidenceCandidates",
+      "topK": 6
+    },
+    "embeddings": {
+      "id": "controlled-vector-v1",
+      "dimensions": 8,
+      "configuration": {
+        "source": "versioned fixture vectors"
+      }
+    },
+    "evidenceSelection": {
+      "id": "similarity-threshold-v1",
+      "configuration": {
+        "threshold": 0.7,
+        "limit": 4
+      }
+    }
+  },
+  "metrics": {
+    "retrievalRecall": {
+      "numerator": 7,
+      "denominator": 7,
+      "score": 1
+    },
+    "evidenceCorrectness": {
+      "numerator": 7,
+      "denominator": 9,
+      "score": 0.7777777777777778
+    },
+    "noAnswerEvidenceSelection": {
+      "numerator": 1,
+      "denominator": 1,
+      "score": 1
+    },
+    "answerCorrectness": null
+  },
+  "cases": [
+    {
+      "id": "exact-fact-txt-survey-time",
+      "intent": "supported",
+      "behaviors": [
+        "exact-fact",
+        "source-location"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.928264
+        },
+        {
+          "rank": 2,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0.381807
+        },
+        {
+          "rank": 3,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0.027747
+        },
+        {
+          "rank": 4,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.026883
+        },
+        {
+          "rank": 5,
+          "chunkId": "aurora-field-manual:chunk-1",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 2,
+          "section": null,
+          "chunkIndex": 1,
+          "similarity": 0.026651
+        },
+        {
+          "rank": 6,
+          "chunkId": "aurora-field-manual:chunk-2",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 3,
+          "section": null,
+          "chunkIndex": 2,
+          "similarity": 0.026651
+        }
+      ],
+      "selectedEvidenceChunkIds": [
+        "cormorant-survey:chunk-0"
+      ],
+      "shouldDecline": false,
+      "metrics": {
+        "retrievalRecall": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "evidenceCorrectness": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "noAnswerEvidenceSelection": null,
+        "answerCorrectness": null
+      }
+    },
+    {
+      "id": "exact-fact-pdf-activation",
+      "intent": "supported",
+      "behaviors": [
+        "exact-fact",
+        "source-location",
+        "competing-documents"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.935561
+        },
+        {
+          "rank": 2,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0.627646
+        },
+        {
+          "rank": 3,
+          "chunkId": "aurora-field-manual:chunk-2",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 3,
+          "section": null,
+          "chunkIndex": 2,
+          "similarity": 0.278243
+        },
+        {
+          "rank": 4,
+          "chunkId": "aurora-field-manual:chunk-1",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 2,
+          "section": null,
+          "chunkIndex": 1,
+          "similarity": 0.231869
+        },
+        {
+          "rank": 5,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0
+        },
+        {
+          "rank": 6,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0
+        }
+      ],
+      "selectedEvidenceChunkIds": [
+        "aurora-field-manual:chunk-0"
+      ],
+      "shouldDecline": false,
+      "metrics": {
+        "retrievalRecall": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "evidenceCorrectness": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "noAnswerEvidenceSelection": null,
+        "answerCorrectness": null
+      }
+    },
+    {
+      "id": "multi-page-pdf-activation-and-voltage",
+      "intent": "supported",
+      "behaviors": [
+        "multi-page-evidence",
+        "source-location"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "aurora-field-manual:chunk-1",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 2,
+          "section": null,
+          "chunkIndex": 1,
+          "similarity": 0.824282
+        },
+        {
+          "rank": 2,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.732482
+        },
+        {
+          "rank": 3,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0.449518
+        },
+        {
+          "rank": 4,
+          "chunkId": "aurora-field-manual:chunk-2",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 3,
+          "section": null,
+          "chunkIndex": 2,
+          "similarity": 0.366348
+        },
+        {
+          "rank": 5,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0.035145
+        },
+        {
+          "rank": 6,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.034758
+        }
+      ],
+      "selectedEvidenceChunkIds": [
+        "aurora-field-manual:chunk-1",
+        "aurora-field-manual:chunk-0"
+      ],
+      "shouldDecline": false,
+      "metrics": {
+        "retrievalRecall": {
+          "numerator": 2,
+          "denominator": 2,
+          "score": 1
+        },
+        "evidenceCorrectness": {
+          "numerator": 2,
+          "denominator": 2,
+          "score": 1
+        },
+        "noAnswerEvidenceSelection": null,
+        "answerCorrectness": null
+      }
+    },
+    {
+      "id": "markdown-section-water-cycle",
+      "intent": "supported",
+      "behaviors": [
+        "exact-fact",
+        "source-location",
+        "competing-documents"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0.938609
+        },
+        {
+          "rank": 2,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0.767655
+        },
+        {
+          "rank": 3,
+          "chunkId": "meridian-habitat:chunk-2",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Communications",
+          "chunkIndex": 2,
+          "similarity": 0.452249
+        },
+        {
+          "rank": 4,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.416932
+        },
+        {
+          "rank": 5,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.34052
+        },
+        {
+          "rank": 6,
+          "chunkId": "aurora-field-manual:chunk-1",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 2,
+          "section": null,
+          "chunkIndex": 1,
+          "similarity": 0.026651
+        }
+      ],
+      "selectedEvidenceChunkIds": [
+        "meridian-habitat:chunk-1",
+        "meridian-habitat:chunk-0"
+      ],
+      "shouldDecline": false,
+      "metrics": {
+        "retrievalRecall": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "evidenceCorrectness": {
+          "numerator": 1,
+          "denominator": 2,
+          "score": 0.5
+        },
+        "noAnswerEvidenceSelection": null,
+        "answerCorrectness": null
+      }
+    },
+    {
+      "id": "competing-document-service-tag",
+      "intent": "supported",
+      "behaviors": [
+        "exact-fact",
+        "competing-documents",
+        "source-location"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0.950338
+        },
+        {
+          "rank": 2,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0.771058
+        },
+        {
+          "rank": 3,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.651485
+        },
+        {
+          "rank": 4,
+          "chunkId": "meridian-habitat:chunk-2",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Communications",
+          "chunkIndex": 2,
+          "similarity": 0.413576
+        },
+        {
+          "rank": 5,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.266896
+        },
+        {
+          "rank": 6,
+          "chunkId": "aurora-field-manual:chunk-2",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 3,
+          "section": null,
+          "chunkIndex": 2,
+          "similarity": 0.103337
+        }
+      ],
+      "selectedEvidenceChunkIds": [
+        "meridian-habitat:chunk-0",
+        "meridian-habitat:chunk-1"
+      ],
+      "shouldDecline": false,
+      "metrics": {
+        "retrievalRecall": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "evidenceCorrectness": {
+          "numerator": 1,
+          "denominator": 2,
+          "score": 0.5
+        },
+        "noAnswerEvidenceSelection": null,
+        "answerCorrectness": null
+      }
+    },
+    {
+      "id": "markdown-section-backup-phrase",
+      "intent": "supported",
+      "behaviors": [
+        "exact-fact",
+        "source-location"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "meridian-habitat:chunk-2",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Communications",
+          "chunkIndex": 2,
+          "similarity": 0.981294
+        },
+        {
+          "rank": 2,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0.238629
+        },
+        {
+          "rank": 3,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0.221973
+        },
+        {
+          "rank": 4,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.094091
+        },
+        {
+          "rank": 5,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0.0826
+        },
+        {
+          "rank": 6,
+          "chunkId": "aurora-field-manual:chunk-1",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 2,
+          "section": null,
+          "chunkIndex": 1,
+          "similarity": 0
+        }
+      ],
+      "selectedEvidenceChunkIds": [
+        "meridian-habitat:chunk-2"
+      ],
+      "shouldDecline": false,
+      "metrics": {
+        "retrievalRecall": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "evidenceCorrectness": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "noAnswerEvidenceSelection": null,
+        "answerCorrectness": null
+      }
+    },
+    {
+      "id": "unsupported-antenna-warranty",
+      "intent": "no-answer",
+      "behaviors": [
+        "unsupported-answer"
+      ],
+      "retrieved": [
+        {
+          "rank": 1,
+          "chunkId": "aurora-field-manual:chunk-0",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 1,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0
+        },
+        {
+          "rank": 2,
+          "chunkId": "aurora-field-manual:chunk-1",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 2,
+          "section": null,
+          "chunkIndex": 1,
+          "similarity": 0
+        },
+        {
+          "rank": 3,
+          "chunkId": "aurora-field-manual:chunk-2",
+          "documentId": "aurora-field-manual",
+          "pageNumber": 3,
+          "section": null,
+          "chunkIndex": 2,
+          "similarity": 0
+        },
+        {
+          "rank": 4,
+          "chunkId": "cormorant-survey:chunk-0",
+          "documentId": "cormorant-survey",
+          "pageNumber": null,
+          "section": null,
+          "chunkIndex": 0,
+          "similarity": 0
+        },
+        {
+          "rank": 5,
+          "chunkId": "meridian-habitat:chunk-0",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook",
+          "chunkIndex": 0,
+          "similarity": 0
+        },
+        {
+          "rank": 6,
+          "chunkId": "meridian-habitat:chunk-1",
+          "documentId": "meridian-habitat",
+          "pageNumber": null,
+          "section": "Meridian Habitat Handbook › Water Reclamation",
+          "chunkIndex": 1,
+          "similarity": 0
+        }
+      ],
+      "selectedEvidenceChunkIds": [],
+      "shouldDecline": true,
+      "metrics": {
+        "retrievalRecall": null,
+        "evidenceCorrectness": null,
+        "noAnswerEvidenceSelection": {
+          "numerator": 1,
+          "denominator": 1,
+          "score": 1
+        },
+        "answerCorrectness": null
+      }
+    }
+  ]
+}
