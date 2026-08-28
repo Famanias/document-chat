@@ -18,6 +18,9 @@ For a stable evaluator demo, use an OpenRouter account with credits and pin a cu
 | `OPENROUTER_API_KEY` | OpenRouter API Key for embeddings and chat generation | `sk-or-v1-...` |
 | `OPENROUTER_CHAT_MODEL` | (Optional) Chat model identifier (default: `openrouter/free`) | `openrouter/free` |
 | `OPENROUTER_EMBEDDING_MODEL` | (Optional) Embedding model (default: `liquid/lfm-2.5-embedding-350m:free`) | `liquid/lfm-2.5-embedding-350m:free` |
+| `GUEST_MAX_UPLOAD_BYTES` | (Optional) Temporary upload byte limit (default 4 MiB) | `4194304` |
+| `GUEST_MAX_MESSAGE_CHARACTERS` | (Optional) Temporary question character limit | `12000` |
+| `GUEST_REQUESTS_PER_MINUTE` | (Optional) Baseline per-session API request limit | `60` |
 
 ## Deployment Steps
 

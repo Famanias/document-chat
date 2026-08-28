@@ -4,6 +4,13 @@ The application uses Neon serverless PostgreSQL with the `pgvector` extension.
 
 ## Tables
 
+### `guest_sessions`
+Maps an opaque browser-session guest credential to its single owned conversation.
+- `credential_digest` (`CHAR(64)`, Primary Key): Lowercase SHA-256 digest; raw credentials are never stored.
+- `workspace_id` (UUID, Unique Foreign Key -> `workspaces.id`): One workspace per guest session.
+- `(workspace_id, chat_id)` (Unique Composite Foreign Key -> `chats(workspace_id, id)`): One same-workspace chat per guest session.
+- `created_at` (TIMESTAMPTZ): Session creation timestamp; retention is implemented by ticket #5.
+
 ### `workspaces`
 Ownership root for every persisted chat graph.
 - `id` (UUID, Primary Key): Server-resolved workspace identifier.
@@ -81,6 +88,7 @@ Migrations are managed via numbered SQL files in `migrations/` and applied using
 - `001_initial.sql`: Creates extensions, tables, constraints, and indexes.
 - `002_openrouter_embeddings.sql`: Adjusts embedding dimension to `VECTOR(1024)` for OpenRouter compatibility.
 - `003_workspace_ownership.sql`: Creates `workspaces`, seeds the pre-auth demo workspace, adds and backfills ownership columns, makes them non-null, installs composite ownership constraints, and adds workspace-first indexes.
+- `004_temporary_guest_conversation.sql`: Creates the digest-only guest-session mapping with unique workspace/chat ownership and composite isolation constraints.
 
 `003_workspace_ownership.sql` is a forward, re-runnable migration. On an upgrade, all rows from the previously single-workspace schema are assigned to `00000000-0000-4000-8000-000000000001`; children derive ownership from their chat or document before constraints are installed. On a clean database, the same migration runs after `001` and `002`. Each migration file is applied in a transaction by `scripts/migrate.mjs`.
 

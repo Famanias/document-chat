@@ -74,13 +74,14 @@ The client sends only the newest user message. The server resolves workspace ide
 ## Database schema
 
 - `workspaces`: ownership roots resolved only on the server
+- `guest_sessions`: SHA-256 credential-digest mappings to one guest workspace and conversation
 - `documents`: workspace ID, filename, MIME type, size, full extracted text, page count, processing status, timestamps
 - `document_chunks`: workspace ID, ordered content, page/section metadata, and a `vector(1024)` embedding
 - `chats`: workspace ID, optional title, and activity timestamps
 - `chat_documents`: workspace-owned many-to-many link that scopes retrieval to the open conversation
 - `messages`: workspace ID, role, readable text, and AI SDK UI `parts` in `structured_data` JSONB so tool evidence survives reloads
 
-Composite foreign keys prevent links, chunks, or messages from crossing a workspace boundary. Workspace deletion cascades through its complete graph without affecting other workspaces. The temporary pre-auth resolver maps the existing unauthenticated UI to one seeded demo workspace; guest and member identity will replace that narrow adapter later. The schema includes workspace-first indexes for scoped access plus HNSW cosine search.
+Composite foreign keys prevent sessions, links, chunks, or messages from crossing a workspace boundary. Workspace deletion cascades through its complete graph without affecting other workspaces. Signed-out browsers receive a 256-bit HTTP-only session credential; only its SHA-256 digest is stored and mapped to one guest conversation. The schema includes workspace-first indexes for scoped access plus HNSW cosine search.
 
 ## Document processing
 
@@ -119,7 +120,7 @@ If no evidence supports the question, the prompt requires: “I couldn't find th
 - Top-six semantic search is predictable and adequate for small documents; no keyword search, reranker, or answer-confidence classifier was added.
 - The application supports multiple documents per chat, but does not include document deletion or re-indexing controls.
 - Full extracted text and embeddings live in Postgres. No local filesystem or object storage is required.
-- Authentication, identity lifecycle, billing, and admin features are deliberately out of scope. Persistence enforces workspace isolation, while the current pre-auth adapter still resolves all demo traffic to one shared workspace until guest/member identity is added.
+- Guest retention/expiry, member accounts, claiming, billing, and admin features remain out of scope. This slice provides isolated browser-session guest identity only.
 - The UI uses plain streamed text rather than a full Markdown renderer, reducing dependencies and rendering risk.
 
 ## Verification
@@ -205,7 +206,7 @@ I replaced the named import with the package's default CommonJS interop import a
 - No OCR for scanned PDFs.
 - No background jobs, resumable indexing, progress events, or retry queue.
 - No hybrid lexical/vector retrieval, reranking, or retrieval evaluation dataset.
-- No guest/member authentication or identity lifecycle yet. Database and query ownership boundaries are in place, but the pre-auth demo adapter remains shared and must be replaced before exposing real private documents.
+- Guest sessions are browser-scoped and temporary; expiry/retention, member accounts, and claim-on-sign-in are tracked in tickets #5–#7.
 - No document deletion/re-indexing UI.
 - The default free OpenRouter routes have tighter rate limits and variable latency/model selection. The stress audit exhausted the demo account's daily free-model quota; a credited account and fixed tool-capable model are required before submission.
 
