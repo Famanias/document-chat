@@ -6,9 +6,6 @@ import { storeDocument } from "@/lib/documents/store";
 import { validateChunkCount, validateUpload } from "@/lib/documents/validate-upload";
 import { chatExists } from "@/lib/chat/store";
 import { resolveWorkspace } from "@/lib/workspaces/context";
-import { parseDocument } from "@/lib/documents/parse";
-import { storeDocument } from "@/lib/documents/store";
-import { validateChunkCount, validateUpload } from "@/lib/documents/validate-upload";
 
 export const maxDuration = 60;
 

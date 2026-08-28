@@ -7,7 +7,6 @@ import {
   type RetrievalCandidate,
 } from "@/lib/ai/retrieval-ranking";
 import { db } from "@/lib/db";
-import type { Evidence } from "@/lib/chat/types";
 import type { WorkspaceContext } from "@/lib/workspaces/context";
 
 type EvidenceRow = {
