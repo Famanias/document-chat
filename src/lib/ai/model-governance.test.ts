@@ -29,7 +29,8 @@ describe("AI model configuration & governance", () => {
     delete process.env.OPENROUTER_EMBEDDING_MODEL;
 
     const config = getModelConfig();
-    expect(config.chat).toBe(DEFAULT_PRODUCTION_CHAT_MODEL);
+    expect(config.chat).toBe("openrouter/free");
+    expect(config.embedding).toBe("liquid/lfm-2.5-embedding-350m:free");
     expect(config.embeddingDimensions).toBe(EMBEDDING_DIMENSIONS);
   });
 

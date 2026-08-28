@@ -118,6 +118,7 @@ export function ChatConversation({
   });
 
   const hasDocument = chat.documents.some((document) => document.status === "ready");
+  const hasFailedDocument = chat.documents.some((document) => document.status === "failed");
   const isGenerating = status === "submitted" || status === "streaming" || sendLocked;
 
   useEffect(() => {
@@ -234,19 +235,34 @@ export function ChatConversation({
 
       {chat.documents.length > 0 ? (
         <div className="flex gap-2 overflow-x-auto border-b bg-[#fbfcfc] px-4 py-2.5 sm:px-6" aria-label="Attached documents">
-          {chat.documents.map((document) => (
-            <div key={document.id} className="flex min-w-0 shrink-0 items-center gap-2 rounded-lg border bg-white px-3 py-2">
-              <FileText aria-hidden="true" className="size-4 shrink-0 text-[var(--primary)]" />
-              <span className="max-w-44 truncate text-xs font-medium text-[#31413d]">{document.filename}</span>
-              <span className="text-[11px] text-[var(--muted)]">{documentMeta(document.pageCount, document.chunkCount)}</span>
-            </div>
-          ))}
+          {chat.documents.map((document) => {
+            const isFailed = document.status === "failed";
+            return (
+              <div
+                key={document.id}
+                className={`flex min-w-0 shrink-0 items-center gap-2 rounded-lg border px-3 py-2 ${
+                  isFailed ? "border-red-200 bg-red-50 text-red-700" : "bg-white"
+                }`}
+              >
+                <FileText
+                  aria-hidden="true"
+                  className={`size-4 shrink-0 ${isFailed ? "text-red-500" : "text-[var(--primary)]"}`}
+                />
+                <span className="max-w-44 truncate text-xs font-medium text-[#31413d]">
+                  {document.filename}
+                </span>
+                <span className={`text-[11px] ${isFailed ? "text-red-600 font-semibold" : "text-[var(--muted)]"}`}>
+                  {isFailed ? "Indexing failed" : documentMeta(document.pageCount, document.chunkCount)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       ) : null}
 
       <main id="chat-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto" aria-live="polite">
         <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-8 sm:px-8 sm:py-10">
-          {messages.length === 0 && !hasDocument ? (
+          {messages.length === 0 && !hasDocument && !hasFailedDocument ? (
             <div className="m-auto max-w-md py-10 text-center">
               <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)]">
                 <FilePlus2 aria-hidden="true" className="size-6" />
@@ -266,6 +282,26 @@ export function ChatConversation({
               <p className="mt-3 text-xs text-[var(--muted)]">
                 Up to {uploadLimitLabel(limits.maxUploadBytes)} · PDFs up to 150 pages
               </p>
+            </div>
+          ) : null}
+
+          {messages.length === 0 && !hasDocument && hasFailedDocument ? (
+            <div className="m-auto max-w-md py-10 text-center">
+              <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-[var(--danger-soft)] text-[var(--danger)]">
+                <AlertCircle aria-hidden="true" className="size-6" />
+              </div>
+              <h2 className="text-xl font-semibold tracking-[-0.02em] text-[#20302c]">Document indexing failed</h2>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[var(--muted)]">
+                The document could not be indexed. Please check your document format or try uploading again.
+              </p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-strong)] focus-visible:outline-2"
+              >
+                <Paperclip aria-hidden="true" className="size-4" />
+                Upload another document
+              </button>
             </div>
           ) : null}
 
