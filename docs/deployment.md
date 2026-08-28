@@ -8,7 +8,7 @@ The application is architected for deployment on Vercel's Hobby plan with Neon P
 - OpenRouter API key.
 - Vercel account.
 
-For a stable evaluator demo, use an OpenRouter account with credits and pin a currently available tool-capable chat model. The free router is suitable for smoke tests, but its daily quota and selected model can vary.
+This project intentionally uses OpenRouter's free chat router and free Liquid embedding model in production. Daily quotas, selected chat models, and availability may vary with OpenRouter's free capacity.
 
 ## Environment Variables
 
@@ -33,7 +33,7 @@ For a stable evaluator demo, use an OpenRouter account with credits and pin a cu
    npx vercel --prod --yes
    ```
 3. **Set Environment Variables in Vercel**:
-   Ensure `DATABASE_URL` and `OPENROUTER_API_KEY` are configured for Production, Preview, and Development. Set `OPENROUTER_CHAT_MODEL` to a fixed tool-capable model for the public demo.
+   Ensure `DATABASE_URL` and `OPENROUTER_API_KEY` are configured for Production, Preview, and Development. Leave the optional model overrides unset to use the zero-budget defaults.
 
 ## Verification Checklist
 
@@ -42,4 +42,4 @@ For a stable evaluator demo, use an OpenRouter account with credits and pin a cu
 - [x] All automated tests pass (`npm test`)
 - [x] Route handlers declare `maxDuration = 60` for serverless streaming
 - [x] `.vercelignore` excludes local test/QA artifacts to prevent file locks during deployment
-- [ ] Confirm provider quota, then run one fresh upload, grounded question, citation check, and reload against the production URL
+- [ ] Confirm free-provider availability, then run one fresh upload, grounded question, citation check, and reload against the production URL

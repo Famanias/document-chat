@@ -34,21 +34,27 @@ describe("AI model configuration & governance", () => {
     expect(config.embeddingDimensions).toBe(EMBEDDING_DIMENSIONS);
   });
 
-  it("returns pinned production defaults when NODE_ENV is production", () => {
+  it("returns zero-budget production defaults when NODE_ENV is production", () => {
     setNodeEnv("production");
     delete process.env.OPENROUTER_CHAT_MODEL;
     delete process.env.OPENROUTER_EMBEDDING_MODEL;
 
     const config = getModelConfig();
-    expect(config.chat).toBe(DEFAULT_PRODUCTION_CHAT_MODEL);
-    expect(config.embedding).toBe(DEFAULT_PRODUCTION_EMBEDDING_MODEL);
+    expect(config.chat).toBe("openrouter/free");
+    expect(config.embedding).toBe("liquid/lfm-2.5-embedding-350m:free");
+    expect(DEFAULT_PRODUCTION_CHAT_MODEL).toBe("openrouter/free");
+    expect(DEFAULT_PRODUCTION_EMBEDDING_MODEL).toBe("liquid/lfm-2.5-embedding-350m:free");
   });
 
-  it("rejects free-tier chat models when NODE_ENV is production", () => {
+  it("accepts explicitly configured free models in production", () => {
     setNodeEnv("production");
     process.env.OPENROUTER_CHAT_MODEL = "meta-llama/llama-3-8b:free";
+    process.env.OPENROUTER_EMBEDDING_MODEL = "liquid/lfm-2.5-embedding-350m:free";
 
-    expect(() => getModelConfig()).toThrow("Production environment cannot use unpinned free-tier");
+    expect(getModelConfig()).toMatchObject({
+      chat: "meta-llama/llama-3-8b:free",
+      embedding: "liquid/lfm-2.5-embedding-350m:free",
+    });
   });
 
   it("records model telemetry without sensitive text", () => {

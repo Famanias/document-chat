@@ -26,7 +26,7 @@ DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 OPENROUTER_API_KEY=your_openrouter_key
 ```
 
-Optional overrides are `OPENROUTER_CHAT_MODEL` (default `openrouter/free`) and `OPENROUTER_EMBEDDING_MODEL` (default `liquid/lfm-2.5-embedding-350m:free`). The defaults are useful for no-cost smoke testing, but free-route quotas and model selection can change. For an evaluator-facing deployment, use an OpenRouter account with credits and pin a currently available tool-capable chat model. Embeddings use the model's native 1,024 dimensions.
+Optional overrides are `OPENROUTER_CHAT_MODEL` (default `openrouter/free`) and `OPENROUTER_EMBEDDING_MODEL` (default `liquid/lfm-2.5-embedding-350m:free`). These zero-budget defaults are used in development and production. Free-route quotas, availability, and chat-model selection can change. Embeddings use the model's native 1,024 dimensions.
 
 Create a Neon project, copy its pooled connection string into `DATABASE_URL`, then run:
 
@@ -171,7 +171,7 @@ Credentialed verification was also completed against Neon and OpenRouter:
 
 1. Create a Neon Free project and run `npm run db:migrate` against its connection string.
 2. Import the Git repository into a Vercel Hobby project.
-3. Add `DATABASE_URL` and `OPENROUTER_API_KEY` to Vercel Production, Preview, and Development as appropriate. For a stable public demo, use an account with credits and set `OPENROUTER_CHAT_MODEL` to a fixed, currently available tool-capable model.
+3. Add `DATABASE_URL` and `OPENROUTER_API_KEY` to Vercel Production, Preview, and Development as appropriate. Leave the optional model overrides unset to use the zero-budget defaults.
 4. Deploy with the Vercel dashboard or `vercel --prod`.
 5. Check provider quota, then independently verify PDF/TXT/MD upload, reload persistence, direct/multi-part/unsupported retrieval, citation accuracy, streaming, and a forced provider error.
 

@@ -1,17 +1,18 @@
-# Production AI model governance and observability
+# Zero-budget AI model governance and observability
 
-Grounded requires explicit, pinned AI models in production with telemetry that protects user privacy.
+Grounded is operated as a zero-budget application. Production and development therefore share free OpenRouter defaults, with telemetry that protects user privacy.
 
-## Pinned Model Defaults
+## Free Model Defaults
 
 | Operation | Default Production Model | Dimensions / Details |
 | --- | --- | --- |
-| **Chat & Grounding** | `google/gemini-2.5-flash` | High accuracy, low latency grounding model |
-| **Embeddings** | `baai/bge-m3` | 1,024-dimensional dense vector embeddings |
+| **Chat & Grounding** | `openrouter/free` | Routes each request to an available free chat model |
+| **Embeddings** | `liquid/lfm-2.5-embedding-350m:free` | 1,024-dimensional dense vector embeddings |
 
 ## Validation & Guardrails
 
-- In `NODE_ENV === "production"`, configuration strictly rejects free-tier `:free` identifiers to prevent rate-limit degradation or silent provider changes.
+- Free models are accepted in production by design. Availability, selected chat model, and rate limits may vary with OpenRouter's free capacity.
+- Environment overrides remain available, but the checked-in defaults must always be usable with an account that has no purchased credits.
 - Embedding vector spaces must match 1,024 dimensions. Changing embedding models requires triggering re-indexing via the durable ingestion workflow.
 
 ## Privacy-Preserving Telemetry
