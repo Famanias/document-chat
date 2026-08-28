@@ -18,6 +18,7 @@ const allMigrations = [
   "006_ingestion_jobs.sql",
   "007_hybrid_retrieval.sql",
   "008_member_accounts.sql",
+  "009_deferrable_workspace_fks.sql",
 ];
 
 const workspaceA = "10000000-0000-4000-8000-000000000001";
