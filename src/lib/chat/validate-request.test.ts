@@ -24,4 +24,20 @@ describe("validateChatRequest", () => {
   ])("rejects malformed or unsafe message input", (value) => {
     expect(validateChatRequest(value)).toBeNull();
   });
+
+  it("honors a configured character limit", () => {
+    expect(
+      validateChatRequest(
+        {
+          id: chatId,
+          message: {
+            id: "question-1",
+            role: "user",
+            parts: [{ type: "text", text: "123456" }],
+          },
+        },
+        5,
+      ),
+    ).toBeNull();
+  });
 });
