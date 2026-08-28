@@ -229,9 +229,6 @@ export async function saveMessage(
     throw new Error("A message ID cannot be reused across conversations or roles.");
   }
 
-    throw new Error("A message ID cannot be reused across conversations or roles.");
-  }
-
   if (message.role === "user" && content) {
     await db().query(
       `
