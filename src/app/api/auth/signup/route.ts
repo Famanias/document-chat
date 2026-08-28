@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiErrorResponse, AppError } from "@/lib/api-errors";
+import { claimCurrentGuestSessionIfPresent } from "@/lib/auth/claim";
 import { getOrCreateMemberWorkspace } from "@/lib/auth/store";
 import { setMemberSessionCookie } from "@/lib/auth/session";
 
@@ -21,16 +22,20 @@ export async function POST(request: Request) {
     const providerSubject = `email|${email.toLowerCase()}`;
 
     const member = await getOrCreateMemberWorkspace(providerSubject, email);
-    await setMemberSessionCookie({
+    const session = {
       userId: member.id,
       email: member.email,
       workspaceId: member.workspaceId,
-    });
+    };
+    await setMemberSessionCookie(session);
+    const claimResult = await claimCurrentGuestSessionIfPresent(session);
 
     return Response.json(
       {
         ok: true,
         user: { id: member.id, email: member.email },
+        claimed: claimResult.claimed,
+        chatId: claimResult.chatId,
       },
       {
         headers: {
