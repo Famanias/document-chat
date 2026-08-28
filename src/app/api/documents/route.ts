@@ -5,6 +5,7 @@ import { parseDocument } from "@/lib/documents/parse";
 import { storeDocument } from "@/lib/documents/store";
 import { validateChunkCount, validateUpload } from "@/lib/documents/validate-upload";
 import { chatExists } from "@/lib/chat/store";
+import { enforceGuestRequestLimit } from "@/lib/guest/limits";
 import { resolveWorkspace } from "@/lib/workspaces/context";
 
 export const maxDuration = 60;
@@ -12,12 +13,16 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const workspace = await resolveWorkspace();
+    enforceGuestRequestLimit(workspace);
     const formData = await request.formData();
     const chatId = formData.get("chatId");
     const file = formData.get("file");
 
     if (typeof chatId !== "string" || !/^[0-9a-f-]{36}$/i.test(chatId)) {
       throw new AppError(400, "Invalid conversation ID.");
+    }
+    if (chatId !== workspace.conversationId) {
+      throw new AppError(404, "That conversation no longer exists.");
     }
     if (!(file instanceof File)) throw new AppError(400, "Choose a document to upload.");
     if (!(await chatExists(workspace, chatId))) {

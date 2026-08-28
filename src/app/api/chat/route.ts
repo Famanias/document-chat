@@ -14,8 +14,12 @@ import { retrieveEvidence } from "@/lib/ai/retrieve";
 import { AppError, apiErrorResponse } from "@/lib/api-errors";
 import { hasReadyDocuments, loadChat, saveMessage } from "@/lib/chat/store";
 import type { ChatMessage, Evidence } from "@/lib/chat/types";
-import { validateChatRequest } from "@/lib/chat/validate-request";
+import {
+  submittedMessageCharacters,
+  validateChatRequest,
+} from "@/lib/chat/validate-request";
 import { modelConfig, requireServerEnv } from "@/lib/env";
+import { enforceGuestRequestLimit, guestLimits } from "@/lib/guest/limits";
 import { resolveWorkspace } from "@/lib/workspaces/context";
 
 export const maxDuration = 60;
@@ -41,14 +45,28 @@ function evidencePrompt(evidence: Evidence[]) {
 export async function POST(request: Request) {
   try {
     const workspace = await resolveWorkspace();
+    enforceGuestRequestLimit(workspace);
     let requestBody: unknown;
     try {
       requestBody = await request.json();
     } catch {
       throw new AppError(400, "The message could not be sent.");
     }
-    const parsed = validateChatRequest(requestBody);
-    if (!parsed) throw new AppError(400, "The message could not be sent.");
+    const maxMessageCharacters = guestLimits().maxMessageCharacters;
+    const parsed = validateChatRequest(requestBody, maxMessageCharacters);
+    if (!parsed) {
+      const submittedCharacters = submittedMessageCharacters(requestBody);
+      if (submittedCharacters !== null && submittedCharacters > maxMessageCharacters) {
+        throw new AppError(
+          413,
+          `Temporary questions are limited to ${maxMessageCharacters.toLocaleString("en-US")} characters. Shorten the question and try again.`,
+        );
+      }
+      throw new AppError(400, "The message could not be sent.");
+    }
+    if (parsed.id !== workspace.conversationId) {
+      throw new AppError(404, "That conversation no longer exists.");
+    }
 
     const chat = await loadChat(workspace, parsed.id);
     if (!chat) throw new AppError(404, "That conversation no longer exists.");
