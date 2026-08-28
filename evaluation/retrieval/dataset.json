@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "grounded-retrieval-core",
+  "datasetVersion": 1,
+  "description": "Synthetic retrieval cases for exact facts, source locations, competing documents, multi-page support, and unsupported questions.",
+  "controlledRun": {
+    "embeddingId": "controlled-vector-v1",
+    "dimensions": 8,
+    "selectionSimilarityThreshold": 0.7,
+    "selectionLimit": 4
+  },
+  "documents": [
+    {
+      "id": "aurora-field-manual",
+      "fixture": "fixtures/aurora-field-manual.pdf",
+      "format": "pdf",
+      "sha256": "6af6c611342d40728e646d59a60f4935131e00c5d4ad7b3d828e6173411f57cd",
+      "controlledChunkEmbeddings": [
+        [1, 0.1, 0.35, 0, 0, 0.1, 0, 0],
+        [0.25, 1, 0, 0, 0, 0.1, 0, 0.3],
+        [0.3, 0.25, 0, 0, 0, 0.1, 0, 1]
+      ]
+    },
+    {
+      "id": "cormorant-survey",
+      "fixture": "fixtures/cormorant-survey.txt",
+      "format": "txt",
+      "sha256": "71d54a0fd8b7ceccc8a7228e627c046d6750b2465ed2d6411131cc2711b5fbde",
+      "controlledChunkEmbeddings": [
+        [0, 0, 0.35, 1, 0, 0.6, 0, 0]
+      ]
+    },
+    {
+      "id": "meridian-habitat",
+      "fixture": "fixtures/meridian-habitat.md",
+      "format": "md",
+      "sha256": "8502130a1ad234c7a916404d39d87bcfea2b6b3e95f6596930c39aba8d5e8617",
+      "controlledChunkEmbeddings": [
+        [0.65, 0, 0.8, 0, 0, 0.1, 0, 0],
+        [0, 0, 1, 0.3, 0, 0.6, 0, 0],
+        [0, 0, 0.5, 0, 0, 0.1, 1, 0]
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "exact-fact-txt-survey-time",
+      "behaviors": ["exact-fact", "source-location"],
+      "question": "At what UTC time does the Cormorant coastal survey begin?",
+      "intent": "supported",
+      "expectedFacts": ["The Cormorant coastal survey begins at 06:10 UTC."],
+      "expectedSupportingLocations": [
+        {
+          "documentId": "cormorant-survey",
+          "location": { "kind": "passage", "chunkIndex": 0 }
+        }
+      ],
+      "acceptableEvidence": [
+        { "documentId": "cormorant-survey", "chunkIndexes": [0] }
+      ],
+      "controlledQueryEmbedding": [0, 0, 0, 1, 0, 0.3, 0, 0]
+    },
+    {
+      "id": "exact-fact-pdf-activation",
+      "behaviors": ["exact-fact", "source-location", "competing-documents"],
+      "question": "What activation sequence is assigned to Station Kestrel?",
+      "intent": "supported",
+      "expectedFacts": ["Station Kestrel uses activation sequence LANTERN-54."],
+      "expectedSupportingLocations": [
+        {
+          "documentId": "aurora-field-manual",
+          "location": { "kind": "page", "pageNumber": 1 }
+        }
+      ],
+      "acceptableEvidence": [
+        { "documentId": "aurora-field-manual", "chunkIndexes": [0] }
+      ],
+      "controlledQueryEmbedding": [1, 0, 0, 0, 0, 0, 0, 0]
+    },
+    {
+      "id": "multi-page-pdf-activation-and-voltage",
+      "behaviors": ["multi-page-evidence", "source-location"],
+      "question": "What are Station Kestrel's activation sequence and reserve-battery voltage?",
+      "intent": "supported",
+      "expectedFacts": [
+        "Station Kestrel uses activation sequence LANTERN-54.",
+        "Station Kestrel uses a 48-volt reserve battery."
+      ],
+      "expectedSupportingLocations": [
+        {
+          "documentId": "aurora-field-manual",
+          "location": { "kind": "page", "pageNumber": 1 }
+        },
+        {
+          "documentId": "aurora-field-manual",
+          "location": { "kind": "page", "pageNumber": 2 }
+        }
+      ],
+      "acceptableEvidence": [
+        { "documentId": "aurora-field-manual", "chunkIndexes": [0] },
+        { "documentId": "aurora-field-manual", "chunkIndexes": [1] }
+      ],
+      "controlledQueryEmbedding": [1, 1, 0, 0, 0, 0.1, 0, 0]
+    },
+    {
+      "id": "markdown-section-water-cycle",
+      "behaviors": ["exact-fact", "source-location", "competing-documents"],
+      "question": "When does the Meridian water-reclamation flush cycle begin, and which filter cartridge is required?",
+      "intent": "supported",
+      "expectedFacts": [
+        "The Meridian flush cycle begins at 06:40 UTC.",
+        "The required filter cartridge is the teal K-12 cartridge."
+      ],
+      "expectedSupportingLocations": [
+        {
+          "documentId": "meridian-habitat",
+          "location": {
+            "kind": "section",
+            "section": "Meridian Habitat Handbook › Water Reclamation"
+          }
+        }
+      ],
+      "acceptableEvidence": [
+        { "documentId": "meridian-habitat", "chunkIndexes": [1] }
+      ],
+      "controlledQueryEmbedding": [0, 0, 1, 0, 0, 0.3, 0, 0]
+    },
+    {
+      "id": "competing-document-service-tag",
+      "behaviors": ["exact-fact", "competing-documents", "source-location"],
+      "question": "Which service tag belongs to the Meridian habitat?",
+      "intent": "supported",
+      "expectedFacts": ["The Meridian habitat service tag is LANTERN-45."],
+      "expectedSupportingLocations": [
+        {
+          "documentId": "meridian-habitat",
+          "location": {
+            "kind": "section",
+            "section": "Meridian Habitat Handbook"
+          }
+        }
+      ],
+      "acceptableEvidence": [
+        { "documentId": "meridian-habitat", "chunkIndexes": [0] }
+      ],
+      "controlledQueryEmbedding": [0.4, 0, 1, 0, 0, 0, 0, 0]
+    },
+    {
+      "id": "markdown-section-backup-phrase",
+      "behaviors": ["exact-fact", "source-location"],
+      "question": "What backup verification phrase does the Meridian habitat transmitter use?",
+      "intent": "supported",
+      "expectedFacts": ["The backup verification phrase is silver meadow."],
+      "expectedSupportingLocations": [
+        {
+          "documentId": "meridian-habitat",
+          "location": {
+            "kind": "section",
+            "section": "Meridian Habitat Handbook › Communications"
+          }
+        }
+      ],
+      "acceptableEvidence": [
+        { "documentId": "meridian-habitat", "chunkIndexes": [2] }
+      ],
+      "controlledQueryEmbedding": [0, 0, 0.3, 0, 0, 0, 1, 0]
+    },
+    {
+      "id": "unsupported-antenna-warranty",
+      "behaviors": ["unsupported-answer"],
+      "question": "How long is the orbital antenna warranty?",
+      "intent": "no-answer",
+      "expectedFacts": [],
+      "expectedSupportingLocations": [],
+      "acceptableEvidence": [],
+      "controlledQueryEmbedding": [0, 0, 0, 0, 1, 0, 0, 0]
+    }
+  ]
+}
