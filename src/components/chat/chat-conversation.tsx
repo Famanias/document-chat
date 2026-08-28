@@ -39,6 +39,10 @@ type Props = {
   onConversationChanged: () => void;
   onResetConversation?: () => Promise<void>;
   onEndSession?: () => Promise<void>;
+  mode?: "guest" | "member";
+  user?: { id: string; email: string } | null;
+  onOpenAuth?: () => void;
+  onSignOut?: () => Promise<void>;
 };
 
 const suggestions = [
@@ -68,6 +72,10 @@ export function ChatConversation({
   onConversationChanged,
   onResetConversation,
   onEndSession,
+  mode = "guest",
+  user,
+  onOpenAuth,
+  onSignOut,
 }: Props) {
   const [input, setInput] = useState("");
   const [dismissedError, setDismissedError] = useState(false);
@@ -172,15 +180,15 @@ export function ChatConversation({
             <button
               type="button"
               onClick={() => void onResetConversation()}
-              title="Start a fresh temporary conversation"
-              aria-label="New temporary conversation"
+              title={mode === "member" ? "Start a new conversation" : "Start a fresh temporary conversation"}
+              aria-label={mode === "member" ? "New conversation" : "New temporary conversation"}
               className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1 text-xs font-medium text-[#31413d] hover:bg-[var(--surface-subtle)] focus-visible:outline-2"
             >
               <Plus aria-hidden="true" className="size-3.5" />
               <span className="hidden sm:inline">New conversation</span>
             </button>
           ) : null}
-          {onEndSession ? (
+          {mode !== "member" && onEndSession ? (
             <button
               type="button"
               onClick={() => void onEndSession()}
@@ -192,13 +200,35 @@ export function ChatConversation({
               <span className="hidden sm:inline">End session</span>
             </button>
           ) : null}
-          <p
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#c9ddd8] bg-[#f2f8f6] px-3 py-1.5 text-xs font-semibold text-[#315e56]"
-            aria-label="Temporary conversation"
-          >
-            <Hourglass aria-hidden="true" className="size-3.5" />
-            <span>Temporary — sign in to save.</span>
-          </p>
+          {mode === "member" && user ? (
+            <div className="flex items-center gap-2">
+              <span
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#c9ddd8] bg-[#f2f8f6] px-3 py-1.5 text-xs font-semibold text-[#315e56]"
+              >
+                <span>{user.email}</span>
+              </span>
+              {onSignOut ? (
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  title="Sign out of your account"
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1 text-xs font-medium text-[#31413d] hover:bg-[var(--surface-subtle)] focus-visible:outline-2"
+                >
+                  <span>Sign out</span>
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#c9ddd8] bg-[#f2f8f6] px-3 py-1.5 text-xs font-semibold text-[#315e56] hover:bg-[#e4f1ed] transition-colors focus-visible:outline-2 cursor-pointer"
+              aria-label="Temporary conversation"
+            >
+              <Hourglass aria-hidden="true" className="size-3.5" />
+              <span>Temporary — sign in to save.</span>
+            </button>
+          )}
         </div>
       </header>
 
