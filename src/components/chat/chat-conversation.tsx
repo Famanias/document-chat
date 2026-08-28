@@ -8,8 +8,7 @@ import {
   FileCheck2,
   FilePlus2,
   FileText,
-  Menu,
-  PanelLeftOpen,
+  Hourglass,
   Paperclip,
   Send,
   Square,
@@ -20,6 +19,11 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "
 import { Message } from "@/components/chat/message";
 import type { ChatDetail, ChatMessage } from "@/lib/chat/types";
 
+export type GuestClientLimits = Readonly<{
+  maxUploadBytes: number;
+  maxMessageCharacters: number;
+}>;
+
 export type UploadState =
   | { status: "idle" }
   | { status: "uploading"; filename: string }
@@ -27,12 +31,10 @@ export type UploadState =
 
 type Props = {
   chat: ChatDetail;
+  limits: GuestClientLimits;
   uploadState: UploadState;
   onUpload: (file: File) => Promise<void>;
-  onMenu: () => void;
   onConversationChanged: () => void;
-  isSidebarMinimized?: boolean;
-  onToggleSidebar?: () => void;
 };
 
 const suggestions = [
@@ -48,14 +50,18 @@ function documentMeta(pageCount: number | null, chunkCount: number) {
   return parts.join(" · ");
 }
 
+function uploadLimitLabel(maxUploadBytes: number) {
+  if (maxUploadBytes < 1024 * 1024) return `${Math.ceil(maxUploadBytes / 1024)} KB`;
+  const megabytes = maxUploadBytes / (1024 * 1024);
+  return `${Number.isInteger(megabytes) ? megabytes : megabytes.toFixed(1)} MB`;
+}
+
 export function ChatConversation({
   chat,
+  limits,
   uploadState,
   onUpload,
-  onMenu,
   onConversationChanged,
-  isSidebarMinimized,
-  onToggleSidebar,
 }: Props) {
   const [input, setInput] = useState("");
   const [dismissedError, setDismissedError] = useState(false);
@@ -67,6 +73,16 @@ export function ChatConversation({
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
+        fetch: async (input, init) => {
+          const response = await fetch(input, init);
+          if (!response.ok) {
+            const body = (await response.clone().json().catch(() => null)) as
+              | { error?: unknown }
+              | null;
+            if (body && typeof body.error === "string") throw new Error(body.error);
+          }
+          return response;
+        },
         prepareSendMessagesRequest({ messages, id, trigger }) {
           return {
             body: {
@@ -131,26 +147,10 @@ export function ChatConversation({
       <a href="#chat-content" className="sr-only z-50 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-[var(--primary)] focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:outline-2">
         Skip to chat
       </a>
-      <header className="flex min-h-16 items-center gap-3 border-b px-4 sm:px-6">
-        <button
-          type="button"
-          onClick={onMenu}
-          className="flex size-11 items-center justify-center rounded-xl text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 lg:hidden"
-          aria-label="Open conversations"
-        >
-          <Menu aria-hidden="true" className="size-5" />
-        </button>
-        {isSidebarMinimized && onToggleSidebar ? (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="hidden size-11 items-center justify-center rounded-xl text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 lg:flex"
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-          >
-            <PanelLeftOpen aria-hidden="true" className="size-5" />
-          </button>
-        ) : null}
+      <header className="flex min-h-[calc(4rem+env(safe-area-inset-top))] items-center gap-3 border-b px-4 pt-[env(safe-area-inset-top)] sm:px-6">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#173f39] text-white">
+          <FileText aria-hidden="true" className="size-4" />
+        </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold text-[#20302c]">
             {chat.title || "New conversation"}
@@ -161,6 +161,13 @@ export function ChatConversation({
               : "No document attached"}
           </p>
         </div>
+        <p
+          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#c9ddd8] bg-[#f2f8f6] px-3 py-1.5 text-xs font-semibold text-[#315e56]"
+          aria-label="Temporary conversation"
+        >
+          <Hourglass aria-hidden="true" className="size-3.5" />
+          <span>Temporary — sign in to save.</span>
+        </p>
       </header>
 
       {chat.documents.length > 0 ? (
@@ -194,7 +201,9 @@ export function ChatConversation({
                 <Paperclip aria-hidden="true" className="size-4" />
                 Choose a document
               </button>
-              <p className="mt-3 text-xs text-[var(--muted)]">Up to 4 MB · PDFs up to 150 pages</p>
+              <p className="mt-3 text-xs text-[var(--muted)]">
+                Up to {uploadLimitLabel(limits.maxUploadBytes)} · PDFs up to 150 pages
+              </p>
             </div>
           ) : null}
 
@@ -254,7 +263,7 @@ export function ChatConversation({
           {error && !dismissedError ? (
             <div className="mb-3 flex items-start gap-2 rounded-xl border border-[#f1c0ba] bg-[var(--danger-soft)] px-3.5 py-3 text-sm text-[var(--danger)]" role="alert">
               <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              <span className="flex-1">The answer could not be generated. Retry the last question.</span>
+              <span className="flex-1">{error.message || "The answer could not be generated. Retry the last question."}</span>
               <button type="button" onClick={retryLastQuestion} className="min-h-11 rounded-lg px-2 text-xs font-semibold hover:bg-[#fee4e2] focus-visible:outline-2">
                 Retry
               </button>
@@ -271,10 +280,10 @@ export function ChatConversation({
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
               rows={2}
-              maxLength={12_000}
+              maxLength={limits.maxMessageCharacters}
               disabled={!hasDocument || isGenerating}
               placeholder={hasDocument ? "Ask a question about your document…" : "Upload a document to ask questions"}
-              className="max-h-40 min-h-14 w-full resize-none rounded-xl border-0 bg-transparent px-3 py-2.5 text-[15px] leading-6 placeholder:text-[#8b9894] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="max-h-40 min-h-14 w-full resize-none rounded-xl border-0 bg-transparent px-3 py-2.5 text-base leading-6 placeholder:text-[#8b9894] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-[15px]"
             />
             <div className="flex items-center justify-between gap-3 px-1 pb-1">
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadState.status === "uploading"} className="flex min-h-11 items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-50">

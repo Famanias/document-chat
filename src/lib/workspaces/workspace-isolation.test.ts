@@ -13,6 +13,7 @@ const allMigrations = [
   "001_initial.sql",
   "002_openrouter_embeddings.sql",
   "003_workspace_ownership.sql",
+  "004_temporary_guest_conversation.sql",
 ];
 
 const workspaceA = "10000000-0000-4000-8000-000000000001";
@@ -89,7 +90,10 @@ describe("workspace ownership migration", () => {
       const database = createDatabase();
       try {
         await applyMigrations(database, allMigrations);
-        await applyMigrations(database, ["003_workspace_ownership.sql"]);
+        await applyMigrations(database, [
+          "003_workspace_ownership.sql",
+          "004_temporary_guest_conversation.sql",
+        ]);
 
         const result = await database.query<{ id: string }>(
           "SELECT id FROM workspaces WHERE id = $1",
@@ -236,4 +240,66 @@ describe("two-workspace isolation", () => {
       expect(retained.rows[0]?.count).toBe(1);
     }
   });
+});
+
+describe("temporary guest session isolation", () => {
+  it(
+    "maps each credential digest to exactly one workspace and conversation without storing raw credentials",
+    async () => {
+      const database = createDatabase();
+      const digestA = "a".repeat(64);
+      const digestB = "b".repeat(64);
+      try {
+        await applyMigrations(database, allMigrations);
+        await seedOwnedGraph(database, workspaceA, "A");
+        await seedOwnedGraph(database, workspaceB, "B");
+        await database.query(
+          "INSERT INTO guest_sessions (credential_digest, workspace_id, chat_id) VALUES ($1, $2, $3), ($4, $5, $6)",
+          [digestA, workspaceA, chatA, digestB, workspaceB, chatB],
+        );
+
+        const sessionA = await database.query<{
+          credential_digest: string;
+          workspace_id: string;
+          chat_id: string;
+        }>(
+          "SELECT credential_digest, workspace_id, chat_id FROM guest_sessions WHERE credential_digest = $1",
+          [digestA],
+        );
+        expect(sessionA.rows).toEqual([
+          { credential_digest: digestA, workspace_id: workspaceA, chat_id: chatA },
+        ]);
+
+        await expect(
+          database.query(
+            "INSERT INTO guest_sessions (credential_digest, workspace_id, chat_id) VALUES ($1, $2, $3)",
+            ["c".repeat(64), workspaceA, chatA],
+          ),
+        ).rejects.toMatchObject({ code: "23505" });
+        const workspaceC = "30000000-0000-4000-8000-000000000003";
+        const chatC = "30000000-0000-4000-8000-000000000013";
+        const workspaceD = "40000000-0000-4000-8000-000000000004";
+        const chatD = "40000000-0000-4000-8000-000000000014";
+        await database.query("INSERT INTO workspaces (id) VALUES ($1)", [workspaceC]);
+        await database.query("INSERT INTO workspaces (id) VALUES ($1)", [workspaceD]);
+        await database.query("INSERT INTO chats (id, workspace_id) VALUES ($1, $2)", [
+          chatC,
+          workspaceC,
+        ]);
+        await database.query("INSERT INTO chats (id, workspace_id) VALUES ($1, $2)", [
+          chatD,
+          workspaceD,
+        ]);
+        await expect(
+          database.query(
+            "INSERT INTO guest_sessions (credential_digest, workspace_id, chat_id) VALUES ($1, $2, $3)",
+            ["d".repeat(64), workspaceC, chatD],
+          ),
+        ).rejects.toMatchObject({ code: "23503" });
+      } finally {
+        await database.close();
+      }
+    },
+    30_000,
+  );
 });

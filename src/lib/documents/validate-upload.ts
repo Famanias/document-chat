@@ -1,6 +1,10 @@
 import { AppError } from "@/lib/api-errors";
+import {
+  DEFAULT_GUEST_MAX_UPLOAD_BYTES,
+  guestLimits,
+} from "@/lib/guest/limits";
 
-export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_FILE_BYTES = DEFAULT_GUEST_MAX_UPLOAD_BYTES;
 export const MAX_DOCUMENT_CHUNKS = 300;
 const extensions = new Set(["pdf", "txt", "md"] as const);
 export type SupportedExtension = "pdf" | "txt" | "md";
@@ -27,10 +31,20 @@ function validateMimeType(extension: SupportedExtension, mimeType: string) {
   if (!valid) throw new AppError(415, "The file type does not match its extension.");
 }
 
+function fileLimitLabel(maxFileBytes: number) {
+  if (maxFileBytes < 1024 * 1024) return `${Math.ceil(maxFileBytes / 1024)} KB`;
+  const maxMegabytes = maxFileBytes / (1024 * 1024);
+  return `${Number.isInteger(maxMegabytes) ? maxMegabytes : maxMegabytes.toFixed(1)} MB`;
+}
+
 export function validateUpload(file: { name: string; size: number; type: string }) {
+  const maxFileBytes = guestLimits().maxUploadBytes;
   if (file.size === 0) throw new AppError(400, "The selected document is empty.");
-  if (file.size > MAX_FILE_BYTES) {
-    throw new AppError(413, "Documents are limited to 4 MB for this demo.");
+  if (file.size > maxFileBytes) {
+    throw new AppError(
+      413,
+      `Temporary uploads are limited to ${fileLimitLabel(maxFileBytes)}. Choose a smaller document.`,
+    );
   }
 
   const filename = safeFilename(file.name);
