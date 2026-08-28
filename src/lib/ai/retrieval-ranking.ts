@@ -2,12 +2,17 @@ import type { Evidence } from "@/lib/chat/types";
 
 export const RETRIEVAL_LIMIT = 6;
 export const RETRIEVAL_CANDIDATE_LIMIT = 24;
+export const RRF_K = 60;
+export const DEFAULT_VECTOR_WEIGHT = 1.0;
+export const DEFAULT_LEXICAL_WEIGHT = 1.0;
 
 export type RetrievalCandidate = Omit<
   Evidence,
   "id" | "excerpt" | "similarity"
 > & {
-  embedding: readonly number[];
+  embedding?: readonly number[];
+  similarity?: number;
+  lexicalScore?: number;
 };
 
 function assertVector(vector: readonly number[], label: string) {
@@ -63,7 +68,7 @@ export function rankEvidenceCandidates(
     .map((candidate, originalIndex) => ({
       candidate,
       originalIndex,
-      similarity: cosineSimilarity(queryEmbedding, candidate.embedding),
+      similarity: candidate.embedding ? cosineSimilarity(queryEmbedding, candidate.embedding) : (candidate.similarity ?? 0),
     }))
     .sort(
       (left, right) =>
@@ -85,4 +90,80 @@ export function rankEvidenceCandidates(
         similarity,
       }),
     );
+}
+
+export type FusionOptions = {
+  k?: number;
+  vectorWeight?: number;
+  lexicalWeight?: number;
+  limit?: number;
+};
+
+export function reciprocalRankFusion(
+  vectorCandidates: readonly RetrievalCandidate[],
+  lexicalCandidates: readonly RetrievalCandidate[],
+  options: FusionOptions = {},
+): Evidence[] {
+  const k = options.k ?? RRF_K;
+  const vectorWeight = options.vectorWeight ?? DEFAULT_VECTOR_WEIGHT;
+  const lexicalWeight = options.lexicalWeight ?? DEFAULT_LEXICAL_WEIGHT;
+  const limit = options.limit ?? RETRIEVAL_LIMIT;
+
+  const candidateMap = new Map<
+    string,
+    {
+      candidate: RetrievalCandidate;
+      rrfScore: number;
+      vectorRank: number | null;
+      lexicalRank: number | null;
+      similarity: number;
+    }
+  >();
+
+  vectorCandidates.forEach((candidate, index) => {
+    const rank = index + 1;
+    const score = vectorWeight / (k + rank);
+    candidateMap.set(candidate.chunkId, {
+      candidate,
+      rrfScore: score,
+      vectorRank: rank,
+      lexicalRank: null,
+      similarity: candidate.similarity ?? 0,
+    });
+  });
+
+  lexicalCandidates.forEach((candidate, index) => {
+    const rank = index + 1;
+    const score = lexicalWeight / (k + rank);
+    const existing = candidateMap.get(candidate.chunkId);
+    if (existing) {
+      existing.rrfScore += score;
+      existing.lexicalRank = rank;
+    } else {
+      candidateMap.set(candidate.chunkId, {
+        candidate,
+        rrfScore: score,
+        vectorRank: null,
+        lexicalRank: rank,
+        similarity: candidate.similarity ?? 0,
+      });
+    }
+  });
+
+  const sorted = Array.from(candidateMap.values()).sort(
+    (a, b) => b.rrfScore - a.rrfScore || a.candidate.chunkIndex - b.candidate.chunkIndex,
+  );
+
+  return sorted.slice(0, limit).map(({ candidate, similarity }, index): Evidence => ({
+    id: `E${index + 1}`,
+    chunkId: candidate.chunkId,
+    documentId: candidate.documentId,
+    filename: candidate.filename,
+    pageNumber: candidate.pageNumber,
+    section: candidate.section,
+    chunkIndex: candidate.chunkIndex,
+    content: candidate.content,
+    excerpt: createEvidenceExcerpt(candidate.content),
+    similarity,
+  }));
 }
