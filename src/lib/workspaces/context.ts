@@ -3,16 +3,42 @@ import "server-only";
 export type WorkspaceContext = Readonly<{
   workspaceId: string;
   conversationId: string;
+  mode?: "guest" | "member";
+  userId?: string;
+  email?: string;
 }>;
 
 export const PRE_AUTH_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
 
 /**
- * Resolve the browser-session guest on the server for every data operation.
- * The raw credential never leaves the cookie boundary and client-provided IDs
- * never establish workspace ownership.
+ * Resolve the current workspace on the server for every data operation.
+ * Prioritizes authenticated member sessions; falls back to browser-session guest.
  */
 export async function resolveWorkspace(): Promise<WorkspaceContext> {
+  const { resolveMemberSession } = await import("@/lib/auth/session");
+  const memberSession = await resolveMemberSession();
+
+  if (memberSession) {
+    const { listChats, createChat } = await import("@/lib/chat/store");
+    const chats = await listChats({ workspaceId: memberSession.workspaceId, conversationId: "" });
+    let conversationId = chats[0]?.id;
+    if (!conversationId) {
+      const created = await createChat({ workspaceId: memberSession.workspaceId, conversationId: "" });
+      conversationId = created.id;
+    }
+    return Object.freeze({
+      workspaceId: memberSession.workspaceId,
+      conversationId,
+      mode: "member" as const,
+      userId: memberSession.userId,
+      email: memberSession.email,
+    });
+  }
+
   const { resolveGuestWorkspace } = await import("@/lib/workspaces/guest-session");
-  return resolveGuestWorkspace();
+  const guest = await resolveGuestWorkspace();
+  return Object.freeze({
+    ...guest,
+    mode: "guest" as const,
+  });
 }
