@@ -1,6 +1,7 @@
 import { extractText, getDocumentProxy } from "unpdf";
 
 import { AppError } from "@/lib/api-errors";
+import { processPdfPages } from "@/lib/documents/ocr";
 import type { ParsedDocument, SourceSegment } from "@/lib/documents/types";
 
 const MAX_PDF_PAGES = 150;
@@ -74,27 +75,19 @@ export async function parseDocumentCore(
       }
       const { text } = await extractText(pdf, { mergePages: false });
       const pages = text as string[];
-      const segments = pages
-        .map((content, index) => ({
-          content: content.trim(),
-          pageNumber: index + 1,
-          section: null,
-        }))
-        .filter((page) => page.content.length > 0);
+      const { segments, extractedText } = await processPdfPages(pages);
 
       if (segments.length === 0) {
         throw new AppError(
           422,
-          "No selectable text was found in this PDF. Scanned PDFs are not supported yet.",
+          "No readable text was found in this PDF.",
         );
       }
 
       return {
         pageCount: pdf.numPages,
         segments,
-        extractedText: pages
-          .map((content, index) => `--- Page ${index + 1} ---\n${content.trim()}`)
-          .join("\n\n"),
+        extractedText,
       };
     } catch (error) {
       if (error instanceof AppError) throw error;
