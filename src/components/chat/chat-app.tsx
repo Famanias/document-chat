@@ -9,7 +9,7 @@ import {
   type GuestClientLimits,
   type UploadState,
 } from "@/components/chat/chat-conversation";
-import type { ChatDetail, ChatSummary } from "@/lib/chat/types";
+import type { ChatDetail, ChatSummary, DocumentSummary } from "@/lib/chat/types";
 
 type ChatResponse = {
   mode: "guest" | "member";
@@ -173,6 +173,35 @@ export function ChatApp() {
     }
   };
 
+  const retryDocument = async (document: DocumentSummary) => {
+    if (!activeChat) return;
+
+    setUploadState({ status: "uploading", filename: document.filename });
+    try {
+      const result = await requestJson<{ success: boolean; error?: string }>(
+        `/api/documents/${document.id}/reindex`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId: activeChat.id }),
+        },
+      );
+      if (!result.success) {
+        throw new ClientApiError(result.error ?? "The document could not be indexed.");
+      }
+      await loadConversation();
+      setUploadState({ status: "idle" });
+    } catch (error) {
+      setUploadState({
+        status: "error",
+        message:
+          error instanceof ClientApiError
+            ? error.message
+            : "The document could not be indexed. Please try again.",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-dvh items-center justify-center bg-[var(--background)]">
@@ -243,6 +272,7 @@ export function ChatApp() {
         limits={limits}
         uploadState={uploadState}
         onUpload={uploadDocument}
+        onRetryDocument={retryDocument}
         onConversationChanged={() => void loadConversation()}
         onResetConversation={resetConversation}
         onEndSession={endSession}

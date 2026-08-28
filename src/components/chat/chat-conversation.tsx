@@ -11,6 +11,7 @@ import {
   Hourglass,
   Paperclip,
   Plus,
+  RefreshCw,
   Send,
   Square,
   Trash2,
@@ -36,6 +37,7 @@ type Props = {
   limits: GuestClientLimits;
   uploadState: UploadState;
   onUpload: (file: File) => Promise<void>;
+  onRetryDocument?: (document: ChatDetail["documents"][number]) => Promise<void>;
   onConversationChanged: () => void;
   onResetConversation?: () => Promise<void>;
   onEndSession?: () => Promise<void>;
@@ -69,6 +71,7 @@ export function ChatConversation({
   limits,
   uploadState,
   onUpload,
+  onRetryDocument,
   onConversationChanged,
   onResetConversation,
   onEndSession,
@@ -119,6 +122,7 @@ export function ChatConversation({
 
   const hasDocument = chat.documents.some((document) => document.status === "ready");
   const hasFailedDocument = chat.documents.some((document) => document.status === "failed");
+  const failedDocument = chat.documents.find((document) => document.status === "failed");
   const isGenerating = status === "submitted" || status === "streaming" || sendLocked;
 
   useEffect(() => {
@@ -294,14 +298,28 @@ export function ChatConversation({
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[var(--muted)]">
                 The document could not be indexed. Please check your document format or try uploading again.
               </p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-strong)] focus-visible:outline-2"
-              >
-                <Paperclip aria-hidden="true" className="size-4" />
-                Upload another document
-              </button>
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {failedDocument && onRetryDocument ? (
+                  <button
+                    type="button"
+                    onClick={() => void onRetryDocument(failedDocument)}
+                    disabled={uploadState.status === "uploading"}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-strong)] focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RefreshCw aria-hidden="true" className="size-4" />
+                    Retry indexing
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadState.status === "uploading"}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-white px-4 text-sm font-semibold text-[#31413d] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Paperclip aria-hidden="true" className="size-4" />
+                  Upload another document
+                </button>
+              </div>
             </div>
           ) : null}
 

@@ -2,7 +2,12 @@ import "server-only";
 
 import { AppError } from "@/lib/api-errors";
 import { db } from "@/lib/db";
-import { getRawSourceBytes, createIngestionJob, getJobByDocumentId } from "@/lib/ingestion/store";
+import {
+  createIngestionJob,
+  getJobByDocumentId,
+  getRawSourceBytes,
+  retryJob,
+} from "@/lib/ingestion/store";
 import { processIngestionJob } from "@/lib/ingestion/worker";
 import type { WorkspaceContext } from "@/lib/workspaces/context";
 
@@ -82,7 +87,7 @@ export async function reindexDocument(
   workspace: WorkspaceContext,
   chatId: string,
   documentId: string,
-): Promise<{ success: boolean; jobId: string }> {
+): Promise<{ success: boolean; jobId: string; error?: string }> {
   const sql = db();
 
   const docRows = (await sql.query(
@@ -111,6 +116,12 @@ export async function reindexDocument(
   const existingJob = await getJobByDocumentId(workspace, documentId);
   let rawBytes = existingJob ? await getRawSourceBytes(existingJob.id) : null;
 
+  if (existingJob && rawBytes && rawBytes.length > 0) {
+    const retriedJob = await retryJob(workspace, existingJob.id);
+    const result = await processIngestionJob(retriedJob.id);
+    return { ...result, jobId: retriedJob.id };
+  }
+
   if (!rawBytes || rawBytes.length === 0) {
     rawBytes = Buffer.from(doc.extracted_text || "");
   }
@@ -123,7 +134,7 @@ export async function reindexDocument(
     buffer: rawBytes,
   });
 
-  await processIngestionJob(job.id);
+  const result = await processIngestionJob(job.id);
 
-  return { success: true, jobId: job.id };
+  return { ...result, jobId: job.id };
 }

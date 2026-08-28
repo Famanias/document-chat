@@ -81,4 +81,65 @@ describe("guest ChatApp", () => {
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
+
+  it("retries a recoverable failed document instead of requiring another upload", async () => {
+    const failedChat: ChatDetail = {
+      ...chat,
+      documents: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          filename: "resume.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 192_968,
+          pageCount: null,
+          chunkCount: 0,
+          status: "failed",
+          createdAt: "2026-08-27T00:00:00.000Z",
+        },
+      ],
+    };
+    const readyChat: ChatDetail = {
+      ...failedChat,
+      documents: failedChat.documents.map((document) => ({
+        ...document,
+        pageCount: 1,
+        chunkCount: 4,
+        status: "ready" as const,
+      })),
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({
+          mode: "member",
+          chat: failedChat,
+          user: { id: "member-1", email: "member@example.com" },
+        }),
+      )
+      .mockResolvedValueOnce(response({ success: true, jobId: "job-1" }))
+      .mockResolvedValueOnce(
+        response({
+          mode: "member",
+          chat: readyChat,
+          user: { id: "member-1", email: "member@example.com" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatApp />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Retry indexing" }));
+
+    await screen.findByText("Your document is ready");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/documents/22222222-2222-4222-8222-222222222222/reindex",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: chat.id }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/chats", undefined);
+  });
 });
