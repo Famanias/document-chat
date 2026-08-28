@@ -15,6 +15,7 @@ const allMigrations = [
   "003_workspace_ownership.sql",
   "004_temporary_guest_conversation.sql",
   "005_guest_lifecycle.sql",
+  "006_ingestion_jobs.sql",
 ];
 
 const workspaceA = "10000000-0000-4000-8000-000000000001";
