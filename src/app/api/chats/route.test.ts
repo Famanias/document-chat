@@ -6,10 +6,17 @@ const workspace = {
   workspaceId: "10000000-0000-4000-8000-000000000001",
   conversationId: "10000000-0000-4000-8000-000000000011",
 } as const;
+const newWorkspace = {
+  workspaceId: "20000000-0000-4000-8000-000000000002",
+  conversationId: "20000000-0000-4000-8000-000000000022",
+} as const;
+
 const mocks = vi.hoisted(() => ({
   resolveWorkspace: vi.fn(),
   loadChat: vi.fn(),
   enforceGuestRequestLimit: vi.fn(),
+  resetGuestWorkspace: vi.fn(),
+  endGuestSession: vi.fn(),
 }));
 
 vi.mock("@/lib/workspaces/context", () => ({
@@ -18,6 +25,11 @@ vi.mock("@/lib/workspaces/context", () => ({
 
 vi.mock("@/lib/chat/store", () => ({
   loadChat: mocks.loadChat,
+}));
+
+vi.mock("@/lib/workspaces/guest-session", () => ({
+  resetGuestWorkspace: mocks.resetGuestWorkspace,
+  endGuestSession: mocks.endGuestSession,
 }));
 
 vi.mock("@/lib/guest/limits", () => ({
@@ -29,12 +41,13 @@ vi.mock("@/lib/guest/limits", () => ({
   }),
 }));
 
-import { GET } from "@/app/api/chats/route";
+import { DELETE, GET } from "@/app/api/chats/route";
 
-describe("chats route workspace resolution", () => {
+describe("chats route workspace resolution and lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.resolveWorkspace.mockResolvedValue(workspace);
+    mocks.resetGuestWorkspace.mockResolvedValue({ workspace: newWorkspace, credential: "new" });
   });
 
   it("loads only the server-mapped guest conversation", async () => {
@@ -116,5 +129,27 @@ describe("chats route workspace resolution", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Too many requests from this temporary conversation. Wait a minute and try again.",
     });
+  });
+
+  it("resets the guest conversation on DELETE ?action=reset", async () => {
+    mocks.loadChat.mockResolvedValue({ id: newWorkspace.conversationId, messages: [], documents: [] });
+
+    const response = await DELETE(new Request("http://localhost/api/chats?action=reset", { method: "DELETE" }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.resetGuestWorkspace).toHaveBeenCalled();
+    expect(mocks.loadChat).toHaveBeenCalledWith(newWorkspace, newWorkspace.conversationId);
+    await expect(response.json()).resolves.toMatchObject({
+      mode: "guest",
+      chat: { id: newWorkspace.conversationId },
+    });
+  });
+
+  it("ends the guest session on DELETE ?action=end", async () => {
+    const response = await DELETE(new Request("http://localhost/api/chats?action=end", { method: "DELETE" }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.endGuestSession).toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({ ok: true });
   });
 });

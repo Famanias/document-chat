@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   digestGuestCredential,
   generateGuestCredential,
+  GUEST_INACTIVITY_LIMIT_MS,
   guestCookieOptions,
   isGuestCredential,
   resolveGuestCredential,
@@ -20,11 +21,15 @@ function repository(overrides: Partial<GuestSessionRepository> = {}): GuestSessi
   return {
     findByDigest: vi.fn(async () => null),
     create: vi.fn(async () => workspace),
+    touchActivity: vi.fn(async () => {}),
+    deleteByDigest: vi.fn(async () => {}),
+    deleteByWorkspaceId: vi.fn(async () => {}),
+    cleanupExpired: vi.fn(async () => ({ deletedCount: 0 })),
     ...overrides,
   };
 }
 
-describe("guest credentials", () => {
+describe("guest credentials and session lifecycle", () => {
   it("generates a 256-bit opaque credential and a one-way digest", () => {
     const credential = generateGuestCredential();
     const digest = digestGuestCredential(credential);
@@ -35,16 +40,43 @@ describe("guest credentials", () => {
     expect(digest).not.toContain(credential);
   });
 
-  it("resumes the same workspace and conversation for a valid session", async () => {
+  it("resumes the same workspace and touches activity for a valid unexpired session", async () => {
     const credential = generateGuestCredential();
+    const now = new Date("2026-08-28T12:00:00Z");
     const store = repository({ findByDigest: vi.fn(async () => workspace) });
 
-    await expect(resolveGuestCredential(credential, store)).resolves.toEqual({
+    await expect(
+      resolveGuestCredential(credential, store, () => now),
+    ).resolves.toEqual({
       workspace,
       credentialToSet: null,
     });
-    expect(store.findByDigest).toHaveBeenCalledWith(digestGuestCredential(credential));
+    expect(store.findByDigest).toHaveBeenCalledWith(digestGuestCredential(credential), now);
+    expect(store.touchActivity).toHaveBeenCalledWith(digestGuestCredential(credential), now);
     expect(store.create).not.toHaveBeenCalled();
+  });
+
+  it("expires a session after 1 hour of inactivity and creates a fresh session", async () => {
+    const credential = generateGuestCredential();
+    const initialTime = new Date("2026-08-28T12:00:00Z");
+    const expiredTime = new Date(initialTime.getTime() + GUEST_INACTIVITY_LIMIT_MS + 1000);
+
+    const store = repository({
+      findByDigest: vi.fn(async (_digest, now?: Date) => {
+        if (now && now.getTime() > initialTime.getTime() + GUEST_INACTIVITY_LIMIT_MS) {
+          return null; // Expired
+        }
+        return workspace;
+      }),
+    });
+
+    const result = await resolveGuestCredential(credential, store, () => expiredTime);
+
+    expect(result.workspace).toEqual(workspace);
+    expect(result.credentialToSet).toSatisfy(isGuestCredential);
+    expect(result.credentialToSet).not.toBe(credential);
+    expect(store.deleteByDigest).toHaveBeenCalledWith(digestGuestCredential(credential));
+    expect(store.create).toHaveBeenCalled();
   });
 
   it.each(["malformed", generateGuestCredential()])(
@@ -58,6 +90,7 @@ describe("guest credentials", () => {
       expect(result.credentialToSet).not.toBe(presentedCredential);
       expect(store.create).toHaveBeenCalledWith(
         digestGuestCredential(result.credentialToSet as string),
+        expect.any(Date),
       );
     },
   );

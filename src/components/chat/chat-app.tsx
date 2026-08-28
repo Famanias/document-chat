@@ -71,6 +71,42 @@ export function ChatApp() {
     return () => window.clearTimeout(timeout);
   }, [loadConversation]);
 
+  const resetConversation = async () => {
+    setIsLoading(true);
+    setAppError(null);
+    try {
+      const response = await requestJson<ChatResponse>("/api/chats?action=reset", {
+        method: "DELETE",
+      });
+      setActiveChat(response.chat);
+      setLimits(response.limits);
+      setUploadState({ status: "idle" });
+    } catch (error) {
+      setAppError(
+        error instanceof ClientApiError ? error.message : "Failed to reset conversation.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const endSession = async () => {
+    setIsLoading(true);
+    setAppError(null);
+    try {
+      await requestJson<{ ok: boolean }>("/api/chats?action=end", {
+        method: "DELETE",
+      });
+      await loadConversation(true);
+    } catch (error) {
+      setAppError(
+        error instanceof ClientApiError ? error.message : "Failed to end session.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const uploadDocument = async (file: File) => {
     if (!activeChat) return;
     const extension = file.name.split(".").pop()?.toLowerCase();
@@ -150,6 +186,8 @@ export function ChatApp() {
         uploadState={uploadState}
         onUpload={uploadDocument}
         onConversationChanged={() => void loadConversation()}
+        onResetConversation={resetConversation}
+        onEndSession={endSession}
       />
     </div>
   );
