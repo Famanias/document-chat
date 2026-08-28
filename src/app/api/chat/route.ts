@@ -64,7 +64,8 @@ export async function POST(request: Request) {
       }
       throw new AppError(400, "The message could not be sent.");
     }
-    if (parsed.id !== workspace.conversationId) {
+
+    if (workspace.mode !== "member" && parsed.id !== workspace.conversationId) {
       throw new AppError(404, "That conversation no longer exists.");
     }
 
@@ -125,7 +126,7 @@ ${evidencePrompt(evidence)}`,
         stepNumber === 0
           ? {
               activeTools: ["showEvidence"],
-              toolChoice: { type: "tool", toolName: "showEvidence" },
+              toolChoice: "auto",
             }
           : { activeTools: [], toolChoice: "none" },
     });
