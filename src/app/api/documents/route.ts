@@ -1,11 +1,9 @@
 import { apiErrorResponse, AppError } from "@/lib/api-errors";
-import { embedDocumentChunks } from "@/lib/ai/embeddings";
-import { chunkSegments } from "@/lib/documents/chunk";
-import { parseDocument } from "@/lib/documents/parse";
-import { storeDocument } from "@/lib/documents/store";
-import { validateChunkCount, validateUpload } from "@/lib/documents/validate-upload";
 import { chatExists } from "@/lib/chat/store";
+import { validateUpload } from "@/lib/documents/validate-upload";
 import { enforceGuestRequestLimit } from "@/lib/guest/limits";
+import { createIngestionJob, getJob } from "@/lib/ingestion/store";
+import { processIngestionJob } from "@/lib/ingestion/worker";
 import { resolveWorkspace } from "@/lib/workspaces/context";
 
 export const maxDuration = 60;
@@ -28,24 +26,34 @@ export async function POST(request: Request) {
     if (!(await chatExists(workspace, chatId))) {
       throw new AppError(404, "That conversation no longer exists.");
     }
-    const { filename, extension } = validateUpload(file);
 
-    const parsed = await parseDocument(extension, await file.arrayBuffer());
-    const chunks = chunkSegments(parsed.segments);
-    if (chunks.length === 0) throw new AppError(422, "No readable text was found in this document.");
-    validateChunkCount(chunks.length);
-    const embeddings = await embedDocumentChunks(chunks.map((chunk) => chunk.content));
-    const document = await storeDocument(workspace, {
+    const { filename, extension } = validateUpload(file);
+    const mimeType = file.type || (extension === "pdf" ? "application/pdf" : "text/plain");
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    const job = await createIngestionJob(workspace, {
       chatId,
       filename,
-      mimeType: file.type || (extension === "pdf" ? "application/pdf" : "text/plain"),
+      mimeType,
       sizeBytes: file.size,
-      parsed,
-      chunks,
-      embeddings,
+      buffer,
     });
 
-    return Response.json({ document }, { status: 201 });
+    // Execute the durable state machine
+    await processIngestionJob(job.id);
+    const updatedJob = await getJob(workspace, job.id);
+
+    return Response.json(
+      {
+        job: updatedJob,
+        document: {
+          id: job.documentId,
+          filename: job.filename,
+          status: updatedJob?.status ?? "processing",
+        },
+      },
+      { status: updatedJob?.status === "ready" ? 201 : 202 },
+    );
   } catch (error) {
     return apiErrorResponse(error);
   }
