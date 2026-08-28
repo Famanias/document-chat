@@ -89,6 +89,12 @@ Migrations are managed via numbered SQL files in `migrations/` and applied using
 - `002_openrouter_embeddings.sql`: Adjusts embedding dimension to `VECTOR(1024)` for OpenRouter compatibility.
 - `003_workspace_ownership.sql`: Creates `workspaces`, seeds the pre-auth demo workspace, adds and backfills ownership columns, makes them non-null, installs composite ownership constraints, and adds workspace-first indexes.
 - `004_temporary_guest_conversation.sql`: Creates the digest-only guest-session mapping with unique workspace/chat ownership and composite isolation constraints.
+- `005_guest_lifecycle.sql`: Adds `last_active_at` and `expires_at` (1-hour default) to `guest_sessions` with expiry indexing.
+- `006_ingestion_jobs.sql`: Adds `ingestion_jobs` table for asynchronous, resumable, and observable ingestion pipeline.
+- `007_hybrid_retrieval.sql`: Adds `content_tsv TSVECTOR` generated column and GIN index for PostgreSQL full-text search.
+- `008_member_accounts.sql`: Adds `member_accounts` table mapping provider subjects to persistent workspaces.
+- `009_deferrable_workspace_fks.sql`: Installs deferred foreign key constraints supporting atomic conversation graph claims.
+- `010_rate_limits.sql`: Adds `rate_limit_buckets` table for multi-instance rate limiting.
 
 `003_workspace_ownership.sql` is a forward, re-runnable migration. On an upgrade, all rows from the previously single-workspace schema are assigned to `00000000-0000-4000-8000-000000000001`; children derive ownership from their chat or document before constraints are installed. On a clean database, the same migration runs after `001` and `002`. Each migration file is applied in a transaction by `scripts/migrate.mjs`.
 
