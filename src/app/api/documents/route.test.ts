@@ -7,9 +7,9 @@ const workspace = {
 const mocks = vi.hoisted(() => ({
   resolveWorkspace: vi.fn(),
   chatExists: vi.fn(),
-  parseDocument: vi.fn(),
-  storeDocument: vi.fn(),
-  embedDocumentChunks: vi.fn(),
+  createIngestionJob: vi.fn(),
+  getJob: vi.fn(),
+  processIngestionJob: vi.fn(),
   enforceGuestRequestLimit: vi.fn(),
 }));
 
@@ -21,16 +21,13 @@ vi.mock("@/lib/chat/store", () => ({
   chatExists: mocks.chatExists,
 }));
 
-vi.mock("@/lib/documents/parse", () => ({
-  parseDocument: mocks.parseDocument,
+vi.mock("@/lib/ingestion/store", () => ({
+  createIngestionJob: mocks.createIngestionJob,
+  getJob: mocks.getJob,
 }));
 
-vi.mock("@/lib/documents/store", () => ({
-  storeDocument: mocks.storeDocument,
-}));
-
-vi.mock("@/lib/ai/embeddings", () => ({
-  embedDocumentChunks: mocks.embedDocumentChunks,
+vi.mock("@/lib/ingestion/worker", () => ({
+  processIngestionJob: mocks.processIngestionJob,
 }));
 
 vi.mock("@/lib/guest/limits", () => ({
@@ -45,13 +42,13 @@ vi.mock("@/lib/guest/limits", () => ({
 
 import { POST } from "@/app/api/documents/route";
 
-describe("documents route workspace isolation", () => {
+describe("documents route workspace isolation & durable ingestion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.resolveWorkspace.mockResolvedValue(workspace);
   });
 
-  it("rejects another workspace's chat before reading or embedding the file", async () => {
+  it("rejects another workspace's chat before enqueuing or processing", async () => {
     const guessedId = "20000000-0000-4000-8000-000000000012";
     const formData = new FormData();
     formData.set("chatId", guessedId);
@@ -64,33 +61,40 @@ describe("documents route workspace isolation", () => {
     await expect(response.json()).resolves.toEqual({
       error: "That conversation no longer exists.",
     });
-    expect(mocks.chatExists).not.toHaveBeenCalled();
-    expect(mocks.parseDocument).not.toHaveBeenCalled();
-    expect(mocks.embedDocumentChunks).not.toHaveBeenCalled();
-    expect(mocks.storeDocument).not.toHaveBeenCalled();
+    expect(mocks.createIngestionJob).not.toHaveBeenCalled();
+    expect(mocks.processIngestionJob).not.toHaveBeenCalled();
   });
 
-  it("uploads through the resolved guest conversation", async () => {
+  it("creates durable ingestion job and processes document", async () => {
     const formData = new FormData();
     const file = new File(["grounded facts"], "facts.txt", { type: "text/plain" });
     formData.set("chatId", workspace.conversationId);
     formData.set("file", file);
     mocks.chatExists.mockResolvedValue(true);
-    mocks.parseDocument.mockResolvedValue({
-      extractedText: "grounded facts",
-      pageCount: null,
-      segments: [{ content: "grounded facts", pageNumber: null, section: null }],
+    mocks.createIngestionJob.mockResolvedValue({
+      id: "job-1",
+      documentId: "doc-1",
+      filename: "facts.txt",
+      status: "queued",
     });
-    mocks.embedDocumentChunks.mockResolvedValue([Array.from({ length: 1_024 }, () => 0)]);
-    mocks.storeDocument.mockResolvedValue({ id: "document-a", status: "ready" });
+    mocks.processIngestionJob.mockResolvedValue({ success: true });
+    mocks.getJob.mockResolvedValue({
+      id: "job-1",
+      documentId: "doc-1",
+      filename: "facts.txt",
+      status: "ready",
+      stage: "ready",
+      progressPercent: 100,
+    });
 
     const response = await POST({ formData: async () => formData } as Request);
 
     expect(response.status).toBe(201);
     expect(mocks.chatExists).toHaveBeenCalledWith(workspace, workspace.conversationId);
-    expect(mocks.storeDocument).toHaveBeenCalledWith(
+    expect(mocks.createIngestionJob).toHaveBeenCalledWith(
       workspace,
       expect.objectContaining({ chatId: workspace.conversationId, filename: "facts.txt" }),
     );
+    expect(mocks.processIngestionJob).toHaveBeenCalledWith("job-1");
   });
 });
