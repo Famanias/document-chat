@@ -10,8 +10,8 @@ export type ModelConfig = {
 
 export function getModelConfig(): ModelConfig {
   const isProd = process.env.NODE_ENV === "production";
-  const chat = process.env.OPENROUTER_CHAT_MODEL ?? (isProd ? DEFAULT_PRODUCTION_CHAT_MODEL : "openrouter/free");
-  const embedding = process.env.OPENROUTER_EMBEDDING_MODEL ?? (isProd ? DEFAULT_PRODUCTION_EMBEDDING_MODEL : "liquid/lfm-2.5-embedding-350m:free");
+  const chat = process.env.OPENROUTER_CHAT_MODEL ?? DEFAULT_PRODUCTION_CHAT_MODEL;
+  const embedding = process.env.OPENROUTER_EMBEDDING_MODEL ?? DEFAULT_PRODUCTION_EMBEDDING_MODEL;
 
   if (isProd) {
     if (chat.includes(":free") || chat === "openrouter/free") {

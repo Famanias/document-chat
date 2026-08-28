@@ -3,17 +3,20 @@
 import { AlertCircle, RefreshCw, ScanText } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { AuthModal } from "@/components/auth/auth-modal";
 import {
   ChatConversation,
   type GuestClientLimits,
   type UploadState,
 } from "@/components/chat/chat-conversation";
-import type { ChatDetail } from "@/lib/chat/types";
+import type { ChatDetail, ChatSummary } from "@/lib/chat/types";
 
 type ChatResponse = {
-  mode: "guest";
+  mode: "guest" | "member";
   chat: ChatDetail;
-  limits: GuestClientLimits;
+  chats?: ChatSummary[];
+  user?: { id: string; email: string };
+  limits?: GuestClientLimits;
 };
 
 class ClientApiError extends Error {}
@@ -39,11 +42,15 @@ function uploadLimitLabel(maxUploadBytes: number) {
 
 export function ChatApp() {
   const [activeChat, setActiveChat] = useState<ChatDetail | null>(null);
+  const [mode, setMode] = useState<"guest" | "member">("guest");
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [limits, setLimits] = useState<GuestClientLimits>({
     maxUploadBytes: 4 * 1024 * 1024,
     maxMessageCharacters: 12_000,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isSessionEnded, setIsSessionEnded] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [appError, setAppError] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle" });
 
@@ -53,13 +60,17 @@ export function ChatApp() {
     try {
       const response = await requestJson<ChatResponse>("/api/chats");
       setActiveChat(response.chat);
-      setLimits(response.limits);
+      setMode(response.mode);
+      setUser(response.user ?? null);
+      if (response.limits) {
+        setLimits(response.limits);
+      }
     } catch (error) {
       setActiveChat(null);
       setAppError(
         error instanceof ClientApiError
           ? error.message
-          : "Grounded could not open the temporary conversation. Check the app configuration and try again.",
+          : "Grounded could not open the conversation. Check the app configuration and try again.",
       );
     } finally {
       if (showLoading) setIsLoading(false);
@@ -75,11 +86,18 @@ export function ChatApp() {
     setIsLoading(true);
     setAppError(null);
     try {
-      const response = await requestJson<ChatResponse>("/api/chats?action=reset", {
-        method: "DELETE",
-      });
-      setActiveChat(response.chat);
-      setLimits(response.limits);
+      if (mode === "member") {
+        const response = await requestJson<{ chat: ChatDetail }>("/api/chats", {
+          method: "POST",
+        });
+        setActiveChat(response.chat);
+      } else {
+        const response = await requestJson<ChatResponse>("/api/chats?action=reset", {
+          method: "DELETE",
+        });
+        setActiveChat(response.chat);
+        if (response.limits) setLimits(response.limits);
+      }
       setUploadState({ status: "idle" });
     } catch (error) {
       setAppError(
@@ -97,11 +115,24 @@ export function ChatApp() {
       await requestJson<{ ok: boolean }>("/api/chats?action=end", {
         method: "DELETE",
       });
-      await loadConversation(true);
+      setActiveChat(null);
+      setIsSessionEnded(true);
     } catch (error) {
       setAppError(
         error instanceof ClientApiError ? error.message : "Failed to end session.",
       );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    setIsLoading(true);
+    try {
+      await requestJson("/api/auth/signout", { method: "POST" });
+      await loadConversation(true);
+    } catch (error) {
+      setAppError(error instanceof ClientApiError ? error.message : "Failed to sign out.");
     } finally {
       setIsLoading(false);
     }
@@ -149,9 +180,36 @@ export function ChatApp() {
           <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-[#173f39] text-white">
             <ScanText aria-hidden="true" className="size-5" />
           </span>
-          <p className="mt-4 text-sm text-[var(--muted)]">Opening your temporary conversation…</p>
+          <p className="mt-4 text-sm text-[var(--muted)]">Opening your conversation…</p>
         </div>
       </div>
+    );
+  }
+
+  if (isSessionEnded) {
+    return (
+      <main className="flex h-dvh items-center justify-center bg-white px-6">
+        <div className="max-w-md text-center">
+          <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)]">
+            <ScanText aria-hidden="true" className="size-6" />
+          </span>
+          <h1 className="mt-5 text-xl font-semibold text-[#20302c]">Temporary session ended</h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            Your temporary documents and chat data have been deleted.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSessionEnded(false);
+              void loadConversation(true);
+            }}
+            className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[var(--primary-strong)] focus-visible:outline-2"
+          >
+            <RefreshCw aria-hidden="true" className="size-4" />
+            Start new session
+          </button>
+        </div>
+      </main>
     );
   }
 
@@ -162,7 +220,7 @@ export function ChatApp() {
           <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[var(--danger-soft)] text-[var(--danger)]">
             <AlertCircle aria-hidden="true" className="size-6" />
           </span>
-          <h1 className="mt-5 text-xl font-semibold text-[#20302c]">Temporary conversation unavailable</h1>
+          <h1 className="mt-5 text-xl font-semibold text-[#20302c]">Conversation unavailable</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{appError}</p>
           <button
             type="button"
@@ -188,6 +246,15 @@ export function ChatApp() {
         onConversationChanged={() => void loadConversation()}
         onResetConversation={resetConversation}
         onEndSession={endSession}
+        mode={mode}
+        user={user}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onSignOut={signOut}
+      />
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onSuccess={() => void loadConversation(true)}
       />
     </div>
   );
