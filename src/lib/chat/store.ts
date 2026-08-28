@@ -2,8 +2,10 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { AppError } from "@/lib/api-errors";
 import type { ChatDetail, ChatMessage, ChatSummary, DocumentSummary } from "@/lib/chat/types";
 import { db } from "@/lib/db";
+import type { WorkspaceContext } from "@/lib/workspaces/context";
 
 type ChatRow = {
   id: string;
@@ -60,13 +62,20 @@ function partsFromRow(row: MessageRow): ChatMessage["parts"] {
   return [{ type: "text", text: row.content }];
 }
 
-export async function createChat() {
+export async function createChat(workspace: WorkspaceContext) {
   const id = randomUUID();
   const rows = (await db().query(
-    "INSERT INTO chats (id) VALUES ($1) RETURNING id, title, created_at, updated_at",
-    [id],
+    `
+      INSERT INTO chats (id, workspace_id)
+      SELECT $1, workspaces.id
+      FROM workspaces
+      WHERE workspaces.id = $2
+      RETURNING id, title, created_at, updated_at
+    `,
+    [id, workspace.workspaceId],
   )) as unknown as ChatRow[];
   const chat = rows[0];
+  if (!chat) throw new Error("The resolved workspace does not exist.");
   return {
     id: chat.id,
     title: chat.title,
@@ -75,7 +84,7 @@ export async function createChat() {
   };
 }
 
-export async function listChats(): Promise<ChatSummary[]> {
+export async function listChats(workspace: WorkspaceContext): Promise<ChatSummary[]> {
   const rows = (await db().query(`
     SELECT
       chats.id,
@@ -85,12 +94,17 @@ export async function listChats(): Promise<ChatSummary[]> {
       COUNT(DISTINCT chat_documents.document_id) AS document_count,
       COUNT(DISTINCT messages.id) AS message_count
     FROM chats
-    LEFT JOIN chat_documents ON chat_documents.chat_id = chats.id
-    LEFT JOIN messages ON messages.chat_id = chats.id
+    LEFT JOIN chat_documents
+      ON chat_documents.workspace_id = chats.workspace_id
+      AND chat_documents.chat_id = chats.id
+    LEFT JOIN messages
+      ON messages.workspace_id = chats.workspace_id
+      AND messages.chat_id = chats.id
+    WHERE chats.workspace_id = $1
     GROUP BY chats.id
     ORDER BY chats.updated_at DESC
     LIMIT 50
-  `)) as unknown as ChatSummaryRow[];
+  `, [workspace.workspaceId])) as unknown as ChatSummaryRow[];
 
   return rows.map((row) => ({
     id: row.id,
@@ -101,13 +115,28 @@ export async function listChats(): Promise<ChatSummary[]> {
   }));
 }
 
-export async function loadChat(chatId: string): Promise<ChatDetail | null> {
+export async function loadChat(
+  workspace: WorkspaceContext,
+  chatId: string,
+): Promise<ChatDetail | null> {
   const sql = db();
   const [chatRows, messageRows, documentRows] = await Promise.all([
-    sql.query("SELECT id, title, created_at, updated_at FROM chats WHERE id = $1", [chatId]),
     sql.query(
-      "SELECT id, role, content, structured_data FROM messages WHERE chat_id = $1 ORDER BY created_at, id",
-      [chatId],
+      `
+        SELECT id, title, created_at, updated_at
+        FROM chats
+        WHERE workspace_id = $1 AND id = $2
+      `,
+      [workspace.workspaceId, chatId],
+    ),
+    sql.query(
+      `
+        SELECT id, role, content, structured_data
+        FROM messages
+        WHERE workspace_id = $1 AND chat_id = $2
+        ORDER BY created_at, id
+      `,
+      [workspace.workspaceId, chatId],
     ),
     sql.query(
       `
@@ -121,13 +150,19 @@ export async function loadChat(chatId: string): Promise<ChatDetail | null> {
           documents.created_at,
           COUNT(document_chunks.id) AS chunk_count
         FROM documents
-        INNER JOIN chat_documents ON chat_documents.document_id = documents.id
-        LEFT JOIN document_chunks ON document_chunks.document_id = documents.id
-        WHERE chat_documents.chat_id = $1
+        INNER JOIN chat_documents
+          ON chat_documents.workspace_id = documents.workspace_id
+          AND chat_documents.document_id = documents.id
+        LEFT JOIN document_chunks
+          ON document_chunks.workspace_id = documents.workspace_id
+          AND document_chunks.document_id = documents.id
+        WHERE documents.workspace_id = $1
+          AND chat_documents.workspace_id = $1
+          AND chat_documents.chat_id = $2
         GROUP BY documents.id
         ORDER BY documents.created_at
       `,
-      [chatId],
+      [workspace.workspaceId, chatId],
     ),
   ]);
 
@@ -157,18 +192,42 @@ export async function loadChat(chatId: string): Promise<ChatDetail | null> {
   };
 }
 
-export async function saveMessage(chatId: string, message: ChatMessage) {
+export async function saveMessage(
+  workspace: WorkspaceContext,
+  chatId: string,
+  message: ChatMessage,
+) {
   const content = textFromMessage(message);
-  await db().query(
+  const saved = (await db().query(
     `
-      INSERT INTO messages (id, chat_id, role, content, structured_data)
-      VALUES ($1, $2, $3, $4, $5::jsonb)
+      INSERT INTO messages (id, workspace_id, chat_id, role, content, structured_data)
+      SELECT $1, chats.workspace_id, chats.id, $3, $4, $5::jsonb
+      FROM chats
+      WHERE chats.workspace_id = $6 AND chats.id = $2
       ON CONFLICT (id) DO UPDATE SET
         content = EXCLUDED.content,
         structured_data = EXCLUDED.structured_data
+      WHERE messages.workspace_id = EXCLUDED.workspace_id
+        AND messages.chat_id = EXCLUDED.chat_id
+        AND messages.role = EXCLUDED.role
+      RETURNING id
     `,
-    [message.id, chatId, message.role, content, JSON.stringify({ parts: message.parts })],
-  );
+    [
+      message.id,
+      chatId,
+      message.role,
+      content,
+      JSON.stringify({ parts: message.parts }),
+      workspace.workspaceId,
+    ],
+  )) as unknown as Array<{ id: string }>;
+
+  if (saved.length !== 1) {
+    if (!(await chatExists(workspace, chatId))) {
+      throw new AppError(404, "That conversation no longer exists.");
+    }
+    throw new Error("A message ID cannot be reused across conversations or roles.");
+  }
 
   if (message.role === "user" && content) {
     await db().query(
@@ -177,29 +236,40 @@ export async function saveMessage(chatId: string, message: ChatMessage) {
         SET
           title = COALESCE(title, LEFT($2, 72)),
           updated_at = NOW()
-        WHERE id = $1
+        WHERE workspace_id = $3 AND id = $1
       `,
-      [chatId, content],
+      [chatId, content, workspace.workspaceId],
     );
   } else {
-    await db().query("UPDATE chats SET updated_at = NOW() WHERE id = $1", [chatId]);
+    await db().query(
+      "UPDATE chats SET updated_at = NOW() WHERE workspace_id = $2 AND id = $1",
+      [chatId, workspace.workspaceId],
+    );
   }
 }
 
-export async function saveMessages(chatId: string, messages: ChatMessage[]) {
-  await Promise.all(messages.map((message) => saveMessage(chatId, message)));
+export async function chatExists(workspace: WorkspaceContext, chatId: string) {
+  const rows = (await db().query(
+    "SELECT 1 FROM chats WHERE workspace_id = $1 AND id = $2 LIMIT 1",
+    [workspace.workspaceId, chatId],
+  )) as unknown as Record<string, unknown>[];
+  return rows.length > 0;
 }
 
-export async function hasReadyDocuments(chatId: string) {
+export async function hasReadyDocuments(workspace: WorkspaceContext, chatId: string) {
   const rows = (await db().query(
     `
       SELECT 1
       FROM chat_documents
-      INNER JOIN documents ON documents.id = chat_documents.document_id
-      WHERE chat_documents.chat_id = $1 AND documents.status = 'ready'
+      INNER JOIN documents
+        ON documents.workspace_id = chat_documents.workspace_id
+        AND documents.id = chat_documents.document_id
+      WHERE chat_documents.workspace_id = $1
+        AND chat_documents.chat_id = $2
+        AND documents.status = 'ready'
       LIMIT 1
     `,
-    [chatId],
+    [workspace.workspaceId, chatId],
   )) as unknown as Record<string, unknown>[];
   return rows.length > 0;
 }

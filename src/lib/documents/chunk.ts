@@ -1,7 +1,7 @@
 import type { DocumentChunk, SourceSegment } from "@/lib/documents/types";
 
-export const CHUNK_TARGET_CHARACTERS = 1_600;
-export const CHUNK_OVERLAP_CHARACTERS = 200;
+export const CHUNK_TARGET_CHARACTERS = 1_000;
+export const CHUNK_OVERLAP_CHARACTERS = 150;
 
 function normalizeText(value: string) {
   return value

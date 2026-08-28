@@ -7,7 +7,6 @@ type EvidenceCard = {
   section: string | null;
   chunkIndex: number;
   excerpt: string;
-  similarity: number;
 };
 
 function locationLabel(evidence: EvidenceCard) {
@@ -31,7 +30,6 @@ export function EvidenceCards({ evidence }: { evidence: EvidenceCard[] }) {
       </div>
       <div className="space-y-2">
         {evidence.map((item) => {
-          const relevance = Math.round(Math.max(0, Math.min(1, item.similarity)) * 100);
           return (
             <details
               key={item.id}
@@ -47,7 +45,7 @@ export function EvidenceCards({ evidence }: { evidence: EvidenceCard[] }) {
                     <span className="truncate">{item.filename}</span>
                   </span>
                   <span className="block truncate text-xs text-[var(--muted)]">
-                    {locationLabel(item)} · {relevance}% semantic match
+                    {locationLabel(item)}
                   </span>
                 </span>
                 <ChevronDown

@@ -9,6 +9,7 @@ import {
   FilePlus2,
   FileText,
   Menu,
+  PanelLeftOpen,
   Paperclip,
   Send,
   Square,
@@ -30,6 +31,8 @@ type Props = {
   onUpload: (file: File) => Promise<void>;
   onMenu: () => void;
   onConversationChanged: () => void;
+  isSidebarMinimized?: boolean;
+  onToggleSidebar?: () => void;
 };
 
 const suggestions = [
@@ -51,22 +54,32 @@ export function ChatConversation({
   onUpload,
   onMenu,
   onConversationChanged,
+  isSidebarMinimized,
+  onToggleSidebar,
 }: Props) {
   const [input, setInput] = useState("");
   const [dismissedError, setDismissedError] = useState(false);
+  const [sendLocked, setSendLocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sendLockRef = useRef(false);
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        prepareSendMessagesRequest({ messages, id }) {
-          return { body: { id, message: messages.at(-1) } };
+        prepareSendMessagesRequest({ messages, id, trigger }) {
+          return {
+            body: {
+              id,
+              message: messages.at(-1),
+              retry: trigger === "regenerate-message",
+            },
+          };
         },
       }),
     [],
   );
-  const { messages, sendMessage, status, error, stop } = useChat<ChatMessage>({
+  const { messages, sendMessage, status, error, stop, regenerate } = useChat<ChatMessage>({
     id: chat.id,
     messages: chat.messages,
     transport,
@@ -75,7 +88,7 @@ export function ChatConversation({
   });
 
   const hasDocument = chat.documents.some((document) => document.status === "ready");
-  const isGenerating = status === "submitted" || status === "streaming";
+  const isGenerating = status === "submitted" || status === "streaming" || sendLocked;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -84,10 +97,26 @@ export function ChatConversation({
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     const text = input.trim();
-    if (!text || !hasDocument || isGenerating) return;
+    if (!text || !hasDocument || isGenerating || sendLockRef.current) return;
+    sendLockRef.current = true;
+    setSendLocked(true);
     setDismissedError(false);
-    void sendMessage({ text });
+    void sendMessage({ text }).finally(() => {
+      sendLockRef.current = false;
+      setSendLocked(false);
+    });
     setInput("");
+  };
+
+  const retryLastQuestion = () => {
+    if (isGenerating || sendLockRef.current) return;
+    sendLockRef.current = true;
+    setSendLocked(true);
+    setDismissedError(false);
+    void regenerate().finally(() => {
+      sendLockRef.current = false;
+      setSendLocked(false);
+    });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -111,6 +140,17 @@ export function ChatConversation({
         >
           <Menu aria-hidden="true" className="size-5" />
         </button>
+        {isSidebarMinimized && onToggleSidebar ? (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="hidden size-11 items-center justify-center rounded-xl text-[var(--muted)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 lg:flex"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <PanelLeftOpen aria-hidden="true" className="size-5" />
+          </button>
+        ) : null}
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold text-[#20302c]">
             {chat.title || "New conversation"}
@@ -121,15 +161,6 @@ export function ChatConversation({
               : "No document attached"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploadState.status === "uploading"}
-          className="flex min-h-11 items-center gap-2 rounded-xl border bg-white px-3.5 text-sm font-medium text-[#31413d] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <FilePlus2 aria-hidden="true" className="size-4" />
-          <span className="hidden sm:inline">Add document</span>
-        </button>
       </header>
 
       {chat.documents.length > 0 ? (
@@ -223,8 +254,11 @@ export function ChatConversation({
           {error && !dismissedError ? (
             <div className="mb-3 flex items-start gap-2 rounded-xl border border-[#f1c0ba] bg-[var(--danger-soft)] px-3.5 py-3 text-sm text-[var(--danger)]" role="alert">
               <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              <span className="flex-1">The answer could not be generated. Your question was saved; please try again.</span>
-              <button type="button" onClick={() => setDismissedError(true)} aria-label="Dismiss error" className="-m-1 flex size-8 items-center justify-center rounded-lg hover:bg-[#fee4e2] focus-visible:outline-2">
+              <span className="flex-1">The answer could not be generated. Retry the last question.</span>
+              <button type="button" onClick={retryLastQuestion} className="min-h-11 rounded-lg px-2 text-xs font-semibold hover:bg-[#fee4e2] focus-visible:outline-2">
+                Retry
+              </button>
+              <button type="button" onClick={() => setDismissedError(true)} aria-label="Dismiss error" className="flex size-11 items-center justify-center rounded-lg hover:bg-[#fee4e2] focus-visible:outline-2">
                 <X aria-hidden="true" className="size-4" />
               </button>
             </div>
@@ -237,6 +271,7 @@ export function ChatConversation({
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
               rows={2}
+              maxLength={12_000}
               disabled={!hasDocument || isGenerating}
               placeholder={hasDocument ? "Ask a question about your document…" : "Upload a document to ask questions"}
               className="max-h-40 min-h-14 w-full resize-none rounded-xl border-0 bg-transparent px-3 py-2.5 text-[15px] leading-6 placeholder:text-[#8b9894] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
@@ -268,6 +303,7 @@ export function ChatConversation({
         ref={fileInputRef}
         type="file"
         accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+        aria-label="Choose a document"
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0];

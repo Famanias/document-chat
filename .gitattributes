@@ -1,0 +1,3 @@
+*.pdf binary
+evaluation/retrieval/fixtures/*.txt text eol=lf
+evaluation/retrieval/fixtures/*.md text eol=lf

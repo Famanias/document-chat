@@ -3,6 +3,13 @@ import { AlertCircle, Bot } from "lucide-react";
 import { EvidenceCards } from "@/components/chat/evidence-cards";
 import type { ChatMessage } from "@/lib/chat/types";
 
+function plainTextForDisplay(value: string) {
+  return value
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "");
+}
+
 export function Message({ message }: { message: ChatMessage }) {
   const text = message.parts
     .filter((part) => part.type === "text")
@@ -11,12 +18,13 @@ export function Message({ message }: { message: ChatMessage }) {
   const evidenceParts = message.parts.filter(
     (part) => part.type === "tool-showEvidence",
   );
+  const displayText = message.role === "assistant" ? plainTextForDisplay(text) : text;
 
   if (message.role === "user") {
     return (
       <article className="flex justify-end" aria-label="Your message">
         <div className="max-w-[86%] rounded-2xl rounded-br-md bg-[#173f39] px-4 py-3 text-[15px] leading-6 whitespace-pre-wrap text-white sm:max-w-[76%]">
-          {text}
+          {displayText}
         </div>
       </article>
     );
@@ -28,9 +36,9 @@ export function Message({ message }: { message: ChatMessage }) {
         <Bot aria-hidden="true" className="size-4" />
       </div>
       <div className="min-w-0 max-w-[780px] flex-1">
-        {text ? (
+        {displayText ? (
           <div className="text-[15px] leading-7 whitespace-pre-wrap text-[#263531]">
-            {text}
+            {displayText}
           </div>
         ) : null}
         {evidenceParts.map((part, index) => {
